@@ -1,9 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowUpRight, ArrowDownLeft, TrendingUp, TrendingDown, Zap, Bot, Target, Activity } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ArrowUpRight, ArrowDownLeft, TrendingUp, TrendingDown, Zap, Bot, Target, Activity, AlertTriangle } from 'lucide-react';
+import { tradingApi } from '@/services/tradingApi';
+import { TRADING_CONFIG, isApiConfigured, getSetupInstructions } from '@/config/tradingConfig';
+import { useToast } from '@/hooks/use-toast';
 
 interface MarketData {
   symbol: string;
@@ -18,24 +21,25 @@ interface MarketData {
 interface ArbitrageOpportunity {
   symbol: string;
   name: string;
-  buyExchange: string;
-  sellExchange: string;
-  buyPrice: number;
-  sellPrice: number;
-  profitPct: number;
-  profitUsd: number;
+  buy_exchange: string;
+  sell_exchange: string;
+  buy_price: number;
+  sell_price: number;
+  profit_pct: number;
+  profit_usd: number;
   confidence: number;
   priority: number;
+  position_size: number;
 }
 
 interface AISignal {
   symbol: string;
-  name: string;
+  coin: string;
   direction: 'buy' | 'sell' | 'hold';
   confidence: number;
-  currentPrice: number;
-  targetPrice: number;
-  riskLevel: string;
+  current_price: number;
+  target_price: number;
+  risk_level: string;
   timeframe: string;
   analysis: {
     rsi: number;
@@ -43,6 +47,16 @@ interface AISignal {
     volume: number;
     momentum: number;
   };
+}
+
+interface PortfolioData {
+  balance: number;
+  profit_live: number;
+  profit_24h: number;
+  profit_1_5h: number;
+  total_trades: number;
+  successful_trades: number;
+  win_rate: number;
 }
 
 interface EnhancedTradingBotProps {
@@ -61,219 +75,282 @@ export const EnhancedTradingBot: React.FC<EnhancedTradingBotProps> = ({
   const [marketData, setMarketData] = useState<MarketData[]>([]);
   const [arbitrageOpportunities, setArbitrageOpportunities] = useState<ArbitrageOpportunity[]>([]);
   const [aiSignals, setAISignals] = useState<AISignal[]>([]);
+  const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
   const [strategy, setStrategy] = useState('arbitrage');
   const [riskLevel, setRiskLevel] = useState('medium');
   const [tradingBudget, setTradingBudget] = useState(200);
+  const [connectionStatus, setConnectionStatus] = useState('connecting');
+  const [backendConnected, setBackendConnected] = useState(false);
+  const { toast } = useToast();
 
-  const exchanges = ['Binance', 'Coinbase', 'KuCoin', 'OKX', 'Bybit'];
+  // Check if API is configured
+  const apiConfigured = isApiConfigured();
+  const setupInstructions = getSetupInstructions();
 
-  const selectedMarkets = [
-    {
-      symbol: 'BTC/USDT',
-      name: 'Bitcoin',
-      basePrice: 43000,
-      minProfitThreshold: 0.3,
-      tradeAmountPct: 30,
-      volatility: 'medium' as const,
-      priority: 1
-    },
-    {
-      symbol: 'ETH/USDT', 
-      name: 'Ethereum',
-      basePrice: 2600,
-      minProfitThreshold: 0.4,
-      tradeAmountPct: 25,
-      volatility: 'medium' as const,
-      priority: 2
-    },
-    {
-      symbol: 'SOL/USDT',
-      name: 'Solana',
-      basePrice: 100,
-      minProfitThreshold: 0.5,
-      tradeAmountPct: 20,
-      volatility: 'high' as const,
-      priority: 3
-    }
-  ];
-
-  // Simulate real-time market data
+  // Update data from backend API
   useEffect(() => {
-    const generateMarketData = () => {
-      const markets = selectedMarkets.map(market => {
-        const exchangePrices: { [key: string]: number } = {};
-        const basePrice = market.basePrice;
+    const updateData = async () => {
+      try {
+        // Get enhanced status
+        const statusData = await tradingApi.getEnhancedStatus();
         
-        exchanges.forEach(exchange => {
-          // Simulate price variations between exchanges
-          const variation = (Math.random() - 0.5) * (basePrice * 0.005); // 0.5% max variation
-          exchangePrices[exchange] = basePrice + variation;
-        });
-
-        const avgPrice = Object.values(exchangePrices).reduce((a, b) => a + b, 0) / exchanges.length;
-        const change = (Math.random() - 0.5) * 10; // Random change percentage
-
-        return {
-          symbol: market.symbol,
-          name: market.name,
-          price: avgPrice,
-          change,
-          exchanges: exchangePrices,
-          volatility: market.volatility,
-          priority: market.priority
-        };
-      });
-
-      setMarketData(markets);
-      
-      // Generate arbitrage opportunities
-      generateArbitrageOpportunities(markets);
-      
-      // Generate AI signals
-      generateAISignals(markets);
+        if (statusData && !statusData.error) {
+          setBackendConnected(true);
+          setPortfolioData(statusData.portfolio);
+          setAISignals(statusData.ai_signals || []);
+          setArbitrageOpportunities(statusData.arbitrage_opportunities || []);
+          
+          // Update market data from prices
+          if (statusData.prices) {
+            const markets = TRADING_CONFIG.SELECTED_MARKETS.map(market => {
+              const exchangePrices = statusData.prices[market.symbol] || {};
+              const avgPrice = Object.values(exchangePrices).length > 0 
+                ? Object.values(exchangePrices).reduce((a: number, b: number) => a + b, 0) / Object.values(exchangePrices).length
+                : market.basePrice;
+              
+              return {
+                symbol: market.symbol,
+                name: market.name,
+                price: avgPrice,
+                change: (Math.random() - 0.5) * 10, // Simulated change
+                exchanges: exchangePrices,
+                volatility: market.volatility,
+                priority: market.priority
+              };
+            });
+            setMarketData(markets);
+          }
+          
+          setConnectionStatus('connected');
+        } else {
+          setBackendConnected(false);
+          setConnectionStatus('offline');
+          // Use fallback data
+          generateFallbackData();
+        }
+        
+        // Get health check
+        const healthData = await tradingApi.getHealthCheck();
+        if (healthData.status === 'healthy') {
+          setConnectionStatus(`Connected to ${healthData.active_exchanges} exchanges • ${healthData.monitored_markets} markets`);
+        }
+        
+      } catch (error) {
+        console.error('Update error:', error);
+        setBackendConnected(false);
+        setConnectionStatus('connection error');
+        generateFallbackData();
+      }
     };
 
-    generateMarketData();
-    const interval = setInterval(generateMarketData, 5000); // Update every 5 seconds
-
+    // Initial update
+    updateData();
+    
+    // Set up interval for regular updates
+    const interval = setInterval(updateData, TRADING_CONFIG.STATUS_UPDATE_INTERVAL);
+    
     return () => clearInterval(interval);
   }, []);
 
-  const generateArbitrageOpportunities = (markets: MarketData[]) => {
-    const opportunities: ArbitrageOpportunity[] = [];
+  const generateFallbackData = () => {
+    // Generate fallback data when backend is not available
+    const markets = TRADING_CONFIG.SELECTED_MARKETS.map(market => {
+      const exchangePrices: { [key: string]: number } = {};
+      TRADING_CONFIG.EXCHANGES.forEach(exchange => {
+        const variation = (Math.random() - 0.5) * (market.basePrice * 0.005);
+        exchangePrices[exchange] = market.basePrice + variation;
+      });
 
-    markets.forEach(market => {
-      const exchangeNames = Object.keys(market.exchanges);
-      
-      for (let i = 0; i < exchangeNames.length; i++) {
-        for (let j = 0; j < exchangeNames.length; j++) {
-          if (i !== j) {
-            const buyExchange = exchangeNames[i];
-            const sellExchange = exchangeNames[j];
-            const buyPrice = market.exchanges[buyExchange];
-            const sellPrice = market.exchanges[sellExchange];
-            
-            const profitPct = ((sellPrice - buyPrice) / buyPrice) * 100;
-            const minProfit = selectedMarkets.find(m => m.symbol === market.symbol)?.minProfitThreshold || 0.3;
-            
-            if (profitPct > minProfit) {
-              const positionSize = Math.min(tradingBudget, balance * 0.3);
-              const profitUsd = (sellPrice - buyPrice) * (positionSize / buyPrice);
-              
-              opportunities.push({
-                symbol: market.symbol,
-                name: market.name,
-                buyExchange,
-                sellExchange,
-                buyPrice,
-                sellPrice,
-                profitPct: Number(profitPct.toFixed(3)),
-                profitUsd: Number(profitUsd.toFixed(2)),
-                confidence: Math.min(0.9, profitPct / minProfit * 0.6),
-                priority: market.priority
-              });
-            }
-          }
-        }
-      }
+      return {
+        symbol: market.symbol,
+        name: market.name,
+        price: market.basePrice,
+        change: (Math.random() - 0.5) * 10,
+        exchanges: exchangePrices,
+        volatility: market.volatility,
+        priority: market.priority
+      };
     });
-
-    // Sort by profit potential
-    opportunities.sort((a, b) => (b.profitPct * b.priority) - (a.profitPct * a.priority));
-    setArbitrageOpportunities(opportunities.slice(0, 5));
-  };
-
-  const generateAISignals = (markets: MarketData[]) => {
-    const signals: AISignal[] = [];
-
+    
+    setMarketData(markets);
+    
+    // Generate sample arbitrage opportunities
+    const opportunities: ArbitrageOpportunity[] = [];
     markets.forEach(market => {
-      // Simulate technical analysis
-      const rsi = Math.random() * 100;
-      const trend = Math.random() > 0.5 ? 'bullish' : 'bearish';
-      const volume = 0.8 + Math.random() * 1.2; // 0.8 to 2.0
-      const momentum = (Math.random() - 0.5) * 2; // -1 to 1
-
-      let direction: 'buy' | 'sell' | 'hold' = 'hold';
-      let confidence = 0;
-
-      // AI signal logic
-      if (rsi < 35 && trend === 'bullish') {
-        direction = 'buy';
-        confidence = 85 + Math.random() * 10;
-      } else if (rsi > 65 && trend === 'bearish') {
-        direction = 'sell';
-        confidence = 75 + Math.random() * 15;
-      } else if (momentum > 0.5 && volume > 1.3) {
-        direction = 'buy';
-        confidence = 70 + Math.random() * 15;
-      }
-
-      if (confidence > 70) {
-        const targetPct = direction === 'buy' ? 3 : -2;
-        const targetPrice = market.price * (1 + targetPct / 100);
-
-        signals.push({
+      const buyPrice = Math.min(...Object.values(market.exchanges));
+      const sellPrice = Math.max(...Object.values(market.exchanges));
+      const profitPct = ((sellPrice - buyPrice) / buyPrice) * 100;
+      
+      if (profitPct > 0.3) {
+        opportunities.push({
           symbol: market.symbol,
           name: market.name,
-          direction,
-          confidence: Number(confidence.toFixed(1)),
-          currentPrice: Number(market.price.toFixed(4)),
-          targetPrice: Number(targetPrice.toFixed(4)),
-          riskLevel: `${market.volatility} risk`,
-          timeframe: '1-3 hours',
-          analysis: {
-            rsi: Number(rsi.toFixed(1)),
-            trend,
-            volume: Number(volume.toFixed(2)),
-            momentum: Number(momentum.toFixed(2))
-          }
+          buy_exchange: 'Binance',
+          sell_exchange: 'Coinbase',
+          buy_price: buyPrice,
+          sell_price: sellPrice,
+          profit_pct: Number(profitPct.toFixed(3)),
+          profit_usd: Number((profitPct * tradingBudget / 100).toFixed(2)),
+          confidence: 0.7,
+          priority: market.priority,
+          position_size: tradingBudget
         });
       }
     });
-
-    setAISignals(signals.slice(0, 3));
+    
+    setArbitrageOpportunities(opportunities.slice(0, 3));
   };
 
-  const executeArbitrage = (opportunity: ArbitrageOpportunity) => {
-    console.log('Executing arbitrage:', opportunity);
-    
-    // Execute buy order
-    onTrade({
-      symbol: opportunity.symbol,
-      type: 'buy',
-      amount: tradingBudget / opportunity.buyPrice,
-      price: opportunity.buyPrice,
-      exchange: opportunity.buyExchange,
-      strategy: 'arbitrage'
-    });
-
-    // Simulate sell order after brief delay
-    setTimeout(() => {
-      onTrade({
-        symbol: opportunity.symbol,
-        type: 'sell',
-        amount: tradingBudget / opportunity.buyPrice,
-        price: opportunity.sellPrice,
-        exchange: opportunity.sellExchange,
-        strategy: 'arbitrage'
+  const handleStartTrading = async () => {
+    if (tradingBudget < TRADING_CONFIG.MIN_TRADE_AMOUNT) {
+      toast({
+        title: "Invalid Budget",
+        description: `Minimum trading budget is $${TRADING_CONFIG.MIN_TRADE_AMOUNT}`,
+        variant: "destructive",
       });
-    }, 1000);
+      return;
+    }
+
+    try {
+      const result = await tradingApi.startEnhancedTrading({
+        budget: tradingBudget,
+        strategy,
+        risk_level: riskLevel
+      });
+
+      if (result.success) {
+        onToggleActive();
+        toast({
+          title: "Trading Started",
+          description: result.message,
+        });
+      } else {
+        toast({
+          title: "Failed to Start Trading",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Connection Error",
+        description: "Unable to connect to trading backend",
+        variant: "destructive",
+      });
+    }
   };
 
-  const executeAISignal = (signal: AISignal) => {
-    console.log('Executing AI signal:', signal);
-    
-    const amount = (tradingBudget * 0.5) / signal.currentPrice; // Use 50% of budget
-    
-    onTrade({
-      symbol: signal.symbol,
-      type: signal.direction,
-      amount,
-      price: signal.currentPrice,
-      exchange: 'AI_Signal',
-      strategy: 'ai_signal',
-      confidence: signal.confidence
-    });
+  const handleStopTrading = async () => {
+    try {
+      const result = await tradingApi.stopEnhancedTrading();
+      
+      if (result.success) {
+        onToggleActive();
+        toast({
+          title: "Trading Stopped",
+          description: result.message,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to stop trading",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const executeArbitrage = async (opportunity: ArbitrageOpportunity) => {
+    try {
+      const result = await tradingApi.executeArbitrage({
+        symbol: opportunity.symbol,
+        buy_exchange: opportunity.buy_exchange,
+        sell_exchange: opportunity.sell_exchange,
+        position_size: opportunity.position_size
+      });
+
+      if (result.success) {
+        // Also trigger local trade tracking
+        onTrade({
+          symbol: opportunity.symbol,
+          type: 'buy',
+          amount: opportunity.position_size / opportunity.buy_price,
+          price: opportunity.buy_price,
+          exchange: opportunity.buy_exchange,
+          strategy: 'arbitrage'
+        });
+
+        setTimeout(() => {
+          onTrade({
+            symbol: opportunity.symbol,
+            type: 'sell',
+            amount: opportunity.position_size / opportunity.buy_price,
+            price: opportunity.sell_price,
+            exchange: opportunity.sell_exchange,
+            strategy: 'arbitrage'
+          });
+        }, 1000);
+
+        toast({
+          title: "Arbitrage Executed",
+          description: result.message,
+        });
+      } else {
+        toast({
+          title: "Arbitrage Failed",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Execution Error",
+        description: "Failed to execute arbitrage trade",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const executeAISignal = async (signal: AISignal) => {
+    try {
+      const result = await tradingApi.executeEnhancedTrade({
+        symbol: signal.symbol,
+        side: signal.direction,
+        amount_usd: tradingBudget * 0.5,
+        strategy: 'ai_signal',
+        confidence: signal.confidence
+      });
+
+      if (result.success) {
+        // Also trigger local trade tracking
+        onTrade({
+          symbol: signal.symbol,
+          type: signal.direction,
+          amount: (tradingBudget * 0.5) / signal.current_price,
+          price: signal.current_price,
+          exchange: 'AI_Signal',
+          strategy: 'ai_signal',
+          confidence: signal.confidence
+        });
+
+        toast({
+          title: "AI Signal Executed",
+          description: result.message,
+        });
+      } else {
+        toast({
+          title: "Signal Execution Failed",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Execution Error",
+        description: "Failed to execute AI signal",
+        variant: "destructive",
+      });
+    }
   };
 
   const getConfidenceColor = (confidence: number) => {
@@ -284,7 +361,28 @@ export const EnhancedTradingBot: React.FC<EnhancedTradingBotProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Bot Control Panel */}
+      {/* API Configuration Warning */}
+      {!apiConfigured && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <div className="space-y-2">
+              <p className="font-medium">API Configuration Required for Live Trading</p>
+              <p className="text-sm opacity-80">{setupInstructions.message}</p>
+              <div className="text-xs space-y-1 mt-2">
+                {setupInstructions.variables.map((variable, index) => (
+                  <div key={index} className="font-mono bg-gray-100 dark:bg-gray-800 p-1 rounded">
+                    {variable}
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs opacity-70 mt-2">{setupInstructions.note}</p>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Connection Status */}
       <Card className="bg-gray-800/50 border-gray-700">
         <CardHeader>
           <CardTitle className="flex items-center text-white">
@@ -295,8 +393,12 @@ export const EnhancedTradingBot: React.FC<EnhancedTradingBotProps> = ({
               {isActive ? 'ACTIVE' : 'INACTIVE'}
             </div>
           </CardTitle>
+          <div className="text-sm text-gray-400">
+            Status: {connectionStatus} • Backend: {backendConnected ? 'Connected' : 'Offline'}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* ... keep existing code (trading controls and configuration) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-2">Strategy</label>
@@ -331,8 +433,8 @@ export const EnhancedTradingBot: React.FC<EnhancedTradingBotProps> = ({
                 type="number" 
                 value={tradingBudget} 
                 onChange={(e) => setTradingBudget(Number(e.target.value))}
-                min={100} 
-                max={Math.min(1000, balance * 0.5)}
+                min={TRADING_CONFIG.MIN_TRADE_AMOUNT} 
+                max={Math.min(TRADING_CONFIG.MAX_TRADE_AMOUNT, balance * 0.5)}
                 className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white"
               />
             </div>
@@ -340,16 +442,36 @@ export const EnhancedTradingBot: React.FC<EnhancedTradingBotProps> = ({
           
           <div className="flex gap-4">
             <Button 
-              onClick={onToggleActive}
+              onClick={isActive ? handleStopTrading : handleStartTrading}
               className={`flex-1 ${isActive ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}
             >
-              {isActive ? (
-                <>⏹️ Stop Trading</>
-              ) : (
-                <>🚀 Start Trading</>
-              )}
+              {isActive ? '⏹️ Stop Trading' : '🚀 Start Trading'}
             </Button>
           </div>
+
+          {/* Portfolio Stats */}
+          {portfolioData && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+              <div className="bg-gray-700/30 p-3 rounded">
+                <div className="text-xs text-gray-400">Balance</div>
+                <div className="text-lg font-bold text-white">${portfolioData.balance.toFixed(2)}</div>
+              </div>
+              <div className="bg-gray-700/30 p-3 rounded">
+                <div className="text-xs text-gray-400">Live Profit</div>
+                <div className={`text-lg font-bold ${portfolioData.profit_live >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  ${portfolioData.profit_live.toFixed(2)}
+                </div>
+              </div>
+              <div className="bg-gray-700/30 p-3 rounded">
+                <div className="text-xs text-gray-400">Win Rate</div>
+                <div className="text-lg font-bold text-white">{portfolioData.win_rate.toFixed(1)}%</div>
+              </div>
+              <div className="bg-gray-700/30 p-3 rounded">
+                <div className="text-xs text-gray-400">Total Trades</div>
+                <div className="text-lg font-bold text-white">{portfolioData.total_trades}</div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -373,23 +495,23 @@ export const EnhancedTradingBot: React.FC<EnhancedTradingBotProps> = ({
                       <div>
                         <h4 className="font-medium text-white">{opp.name}</h4>
                         <p className="text-sm text-gray-400">
-                          Buy: {opp.buyExchange} (${opp.buyPrice.toFixed(4)}) → 
-                          Sell: {opp.sellExchange} (${opp.sellPrice.toFixed(4)})
+                          Buy: {opp.buy_exchange} (${opp.buy_price.toFixed(4)}) → 
+                          Sell: {opp.sell_exchange} (${opp.sell_price.toFixed(4)})
                         </p>
                       </div>
                       <Badge className="bg-green-600 text-white">
-                        +{opp.profitPct}%
+                        +{opp.profit_pct}%
                       </Badge>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-green-400 font-mono">
-                        Profit: ${opp.profitUsd}
+                        Profit: ${opp.profit_usd}
                       </span>
                       <Button 
                         size="sm" 
                         onClick={() => executeArbitrage(opp)}
                         className="bg-blue-600 hover:bg-blue-700"
-                        disabled={!isActive}
+                        disabled={!isActive && !backendConnected}
                       >
                         Execute
                       </Button>
@@ -421,12 +543,12 @@ export const EnhancedTradingBot: React.FC<EnhancedTradingBotProps> = ({
                   >
                     <div className="flex justify-between items-start mb-2">
                       <div>
-                        <h4 className="font-medium text-white">{signal.name}</h4>
+                        <h4 className="font-medium text-white">{signal.coin}</h4>
                         <p className="text-sm text-gray-400">
                           {signal.direction.toUpperCase()} • {signal.confidence}% confidence
                         </p>
                         <p className="text-xs text-gray-500">
-                          ${signal.currentPrice} → ${signal.targetPrice} • {signal.timeframe}
+                          ${signal.current_price} → ${signal.target_price} • {signal.timeframe}
                         </p>
                       </div>
                       <div className="text-right">
@@ -443,13 +565,13 @@ export const EnhancedTradingBot: React.FC<EnhancedTradingBotProps> = ({
                     </div>
                     <div className="flex justify-between items-center">
                       <div className="text-xs text-gray-400">
-                        RSI: {signal.analysis.rsi} | Trend: {signal.analysis.trend}
+                        RSI: {signal.analysis.rsi.toFixed(1)} | Trend: {signal.analysis.trend}
                       </div>
                       <Button 
                         size="sm" 
                         onClick={() => executeAISignal(signal)}
                         className={`${signal.direction === 'buy' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
-                        disabled={!isActive}
+                        disabled={!isActive && !backendConnected}
                       >
                         Execute
                       </Button>
