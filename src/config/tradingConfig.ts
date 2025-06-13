@@ -2,11 +2,11 @@
 // Trading bot configuration
 export const TRADING_CONFIG = {
   // Backend API Configuration
-  API_BASE_URL: process.env.REACT_APP_API_URL || 'http://localhost:5000',
+  API_BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
   
   // Binance API Configuration (these should be set as environment variables)
-  BINANCE_API_KEY: process.env.REACT_APP_BINANCE_API_KEY || '',
-  BINANCE_SECRET: process.env.REACT_APP_BINANCE_SECRET || '',
+  BINANCE_API_KEY: import.meta.env.VITE_BINANCE_API_KEY || '',
+  BINANCE_SECRET: import.meta.env.VITE_BINANCE_SECRET || '',
   
   // Trading Parameters
   SELECTED_MARKETS: [
@@ -66,12 +66,12 @@ export const isApiConfigured = () => {
 // Environment setup instructions
 export const getSetupInstructions = () => {
   return {
-    message: 'To enable live trading, set these environment variables:',
+    message: 'För att aktivera live trading, sätt dessa miljövariabler:',
     variables: [
-      'REACT_APP_BINANCE_API_KEY=your_binance_api_key',
-      'REACT_APP_BINANCE_SECRET=your_binance_secret',
-      'REACT_APP_API_URL=http://localhost:5000'
+      'VITE_BINANCE_API_KEY=your_binance_api_key',
+      'VITE_BINANCE_SECRET=your_binance_secret',
+      'VITE_API_URL=http://localhost:5000'
     ],
-    note: 'For security, these should be set in your .env.local file or deployment environment'
+    note: 'För säkerhet ska dessa sättas i din .env.local fil eller deployment miljö'
   };
 };
