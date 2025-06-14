@@ -35,20 +35,31 @@ class WalletService {
   private solanaConnection: Connection;
 
   constructor() {
-    this.solanaConnection = new Connection('https://api.mainnet-beta.solana.com');
+    // Use devnet for testing
+    this.solanaConnection = new Connection('https://api.devnet.solana.com');
+  }
+
+  // Check if we're in browser environment
+  private isBrowser(): boolean {
+    return typeof window !== 'undefined';
   }
 
   // Phantom Wallet Integration
   async connectPhantom(): Promise<WalletInfo | null> {
     try {
-      if (typeof window === 'undefined' || !window.solana?.isPhantom) {
-        throw new Error('Phantom wallet inte installerad');
+      if (!this.isBrowser()) {
+        throw new Error('Phantom endast tillgänglig i webbläsare');
       }
 
-      this.phantomAdapter = new PhantomWalletAdapter();
-      await this.phantomAdapter.connect();
+      if (!window.solana?.isPhantom) {
+        // Open Phantom download page
+        window.open('https://phantom.app/', '_blank');
+        throw new Error('Phantom wallet inte installerad. Installationssida öppnad.');
+      }
+
+      const response = await window.solana.connect();
+      const publicKey = response.publicKey;
       
-      const publicKey = this.phantomAdapter.publicKey;
       if (!publicKey) throw new Error('Ingen publik nyckel från Phantom');
 
       const balance = await this.solanaConnection.getBalance(publicKey);
@@ -56,25 +67,33 @@ class WalletService {
       return {
         address: publicKey.toString(),
         balance: balance / 1e9, // Convert lamports to SOL
-        network: 'solana-mainnet',
+        network: 'solana-devnet',
         type: 'phantom'
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Phantom connection error:', error);
-      return null;
+      throw new Error(error.message || 'Phantom anslutning misslyckades');
     }
   }
 
   // MetaMask Integration
   async connectMetaMask(): Promise<WalletInfo | null> {
     try {
-      if (typeof window === 'undefined' || !window.ethereum) {
-        throw new Error('MetaMask inte installerad');
+      if (!this.isBrowser()) {
+        throw new Error('MetaMask endast tillgänglig i webbläsare');
       }
 
-      await window.ethereum.request({ method: 'eth_requestAccounts' });
+      if (!window.ethereum) {
+        window.open('https://metamask.io/download/', '_blank');
+        throw new Error('MetaMask inte installerad. Installationssida öppnad.');
+      }
+
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      if (!accounts || accounts.length === 0) {
+        throw new Error('Inga konton tillgängliga i MetaMask');
+      }
+
       this.metamaskProvider = new ethers.BrowserProvider(window.ethereum);
-      
       const signer = await this.metamaskProvider.getSigner();
       const address = await signer.getAddress();
       const balance = await this.metamaskProvider.getBalance(address);
@@ -83,12 +102,12 @@ class WalletService {
       return {
         address,
         balance: parseFloat(ethers.formatEther(balance)),
-        network: network.name,
+        network: network.name || 'ethereum',
         type: 'metamask'
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('MetaMask connection error:', error);
-      return null;
+      throw new Error(error.message || 'MetaMask anslutning misslyckades');
     }
   }
 
@@ -102,6 +121,15 @@ class WalletService {
     } catch (error) {
       console.error('Disconnect error:', error);
     }
+  }
+
+  // Check if wallets are available
+  isPhantomAvailable(): boolean {
+    return this.isBrowser() && !!window.solana?.isPhantom;
+  }
+
+  isMetaMaskAvailable(): boolean {
+    return this.isBrowser() && !!window.ethereum?.isMetaMask;
   }
 }
 
