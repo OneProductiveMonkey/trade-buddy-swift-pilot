@@ -21,7 +21,7 @@ interface MemeAnalysis {
 
 class MarketDataService {
   private coingeckoBase = 'https://api.coingecko.com/api/v3';
-  private cmcApiKey = process.env.VITE_CMC_API_KEY || '';
+  private cmcApiKey = import.meta.env.VITE_CMC_API_KEY || '';
 
   async getTrendingCoins(): Promise<TrendingCoin[]> {
     try {
