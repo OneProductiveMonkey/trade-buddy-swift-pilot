@@ -26,9 +26,7 @@ export const TradingStrategy: React.FC = () => {
   const fetchRecommendation = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${tradingApi.baseUrl}/api/strategy_recommendation`);
-      if (!response.ok) throw new Error('Failed to fetch recommendation');
-      const data = await response.json();
+      const data = await tradingApi.getStrategyRecommendation();
       setRecommendation(data);
     } catch (error) {
       console.error('Error fetching strategy recommendation:', error);
@@ -44,20 +42,21 @@ export const TradingStrategy: React.FC = () => {
 
   const activateAutoMode = async () => {
     try {
-      const response = await fetch(`${tradingApi.baseUrl}/api/auto_mode`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const result = await tradingApi.activateAutoMode();
       
-      if (!response.ok) throw new Error('Failed to activate auto mode');
-      
-      const data = await response.json();
-      setAutoModeActive(true);
-      
-      toast({
-        title: "Auto-läge aktiverat",
-        description: `AI har rekommenderat ${data.recommended_trades?.length || 0} trades`,
-      });
+      if (result.success) {
+        setAutoModeActive(true);
+        toast({
+          title: "Auto-läge aktiverat",
+          description: `AI har rekommenderat ${result.recommended_trades?.length || 0} trades`,
+        });
+      } else {
+        toast({
+          title: "Fel vid aktivering av auto-läge",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       console.error('Error activating auto mode:', error);
       toast({
@@ -70,7 +69,7 @@ export const TradingStrategy: React.FC = () => {
 
   useEffect(() => {
     fetchRecommendation();
-    const interval = setInterval(fetchRecommendation, 30000); // Update every 30 seconds
+    const interval = setInterval(fetchRecommendation, 30000);
     return () => clearInterval(interval);
   }, []);
 

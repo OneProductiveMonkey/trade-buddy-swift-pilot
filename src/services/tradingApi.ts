@@ -1,7 +1,7 @@
 
 // Backend API service for trading bot communication
 class TradingApiService {
-  private baseUrl: string;
+  public baseUrl: string;
 
   constructor(baseUrl: string = 'http://localhost:5000') {
     this.baseUrl = baseUrl;
@@ -105,19 +105,62 @@ class TradingApiService {
     }
   }
 
-  async getMarketAnalysis(symbol: string) {
+  async getStrategyRecommendation() {
     try {
-      const response = await fetch(`${this.baseUrl}/api/market_analysis/${symbol}`);
-      if (!response.ok) throw new Error('Market analysis failed');
+      const response = await fetch(`${this.baseUrl}/api/strategy_recommendation`);
+      if (!response.ok) throw new Error('Strategy recommendation failed');
       return await response.json();
     } catch (error) {
-      console.error('API Error - Market Analysis:', error);
-      return null;
+      console.error('API Error - Strategy Recommendation:', error);
+      return {
+        recommended_strategy: 'conservative',
+        confidence: 50,
+        reason: 'Demo mode - använder konservativ strategi',
+        market_conditions: {
+          volatility: 0.3,
+          trend_strength: 0.5,
+          portfolio_risk: 0.2
+        }
+      };
+    }
+  }
+
+  async activateAutoMode() {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/auto_mode`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) throw new Error('Auto mode activation failed');
+      return await response.json();
+    } catch (error) {
+      console.error('API Error - Auto Mode:', error);
+      return { success: false, message: 'Auto mode activation failed' };
+    }
+  }
+
+  async getPerformanceSummary() {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/performance_summary`);
+      if (!response.ok) throw new Error('Performance summary failed');
+      return await response.json();
+    } catch (error) {
+      console.error('API Error - Performance Summary:', error);
+      return {
+        metrics: {
+          total_trades: 0,
+          successful_trades: 0,
+          total_profit: 0,
+          win_rate: 0,
+          avg_trade_time: 0
+        },
+        status: 'offline',
+        uptime: 0
+      };
     }
   }
 
   private getFallbackStatus() {
-    // Fallback data when backend is not available
     return {
       portfolio: {
         balance: 10000,

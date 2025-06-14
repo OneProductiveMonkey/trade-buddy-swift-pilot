@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowUp, ArrowDown, TrendingUp } from 'lucide-react';
+import { tradingApi } from '@/services/tradingApi';
+import { useToast } from '@/hooks/use-toast';
 
 interface AISignal {
   coin: string;
@@ -14,184 +15,159 @@ interface AISignal {
   target_price: number;
   risk_level: string;
   timeframe: string;
-  timestamp: string;
+  priority: number;
 }
 
-interface SignalResponse {
-  signals: AISignal[];
-  performance: {
-    total_signals: number;
-    avg_confidence: number;
-    buy_signals: number;
-    sell_signals: number;
-  };
+interface AISignalPanelProps {
+  onExecuteSignal?: (signal: AISignal) => void;
 }
 
-export const AISignalPanel: React.FC<{ onExecuteSignal?: (signal: AISignal) => void }> = ({ 
-  onExecuteSignal 
-}) => {
-  const [signalData, setSignalData] = useState<SignalResponse | null>(null);
+export const AISignalPanel: React.FC<AISignalPanelProps> = ({ onExecuteSignal }) => {
+  const [signals, setSignals] = useState<AISignal[]>([]);
   const [loading, setLoading] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const { toast } = useToast();
 
   const fetchSignals = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/ai_signals');
-      if (!response.ok) throw new Error('Failed to fetch signals');
-      const data = await response.json();
-      setSignalData(data);
+      const data = await tradingApi.getEnhancedStatus();
+      setSignals(data.ai_signals || []);
     } catch (error) {
       console.error('Error fetching AI signals:', error);
+      toast({
+        title: "Fel vid hämtning av AI-signaler",
+        description: "Kunde inte hämta signaler från servern",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
+  const handleExecuteSignal = async (signal: AISignal) => {
+    try {
+      const result = await tradingApi.executeEnhancedTrade({
+        symbol: signal.symbol,
+        side: signal.direction,
+        amount_usd: 200,
+        strategy: 'ai_signal',
+        confidence: signal.confidence / 100
+      });
+
+      if (result.success) {
+        toast({
+          title: "AI Signal Genomförd",
+          description: `${signal.direction.toUpperCase()} ${signal.coin} genomförd`,
+        });
+        
+        if (onExecuteSignal) {
+          onExecuteSignal(signal);
+        }
+      } else {
+        toast({
+          title: "Signal Misslyckades",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Exekveringsfel",
+        description: "Kunde inte genomföra AI signal",
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
     fetchSignals();
-    
-    if (autoRefresh) {
-      const interval = setInterval(fetchSignals, 15000); // Update every 15 seconds
-      return () => clearInterval(interval);
-    }
-  }, [autoRefresh]);
+    const interval = setInterval(fetchSignals, 30000); // Update every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 85) return 'bg-green-500';
-    if (confidence >= 75) return 'bg-yellow-500';
+    if (confidence >= 80) return 'bg-green-500';
+    if (confidence >= 60) return 'bg-yellow-500';
     return 'bg-red-500';
   };
 
-  const getDirectionIcon = (direction: string) => {
-    return direction === 'buy' ? (
-      <ArrowUp className="w-4 h-4 text-green-400" />
-    ) : (
-      <ArrowDown className="w-4 h-4 text-red-400" />
-    );
-  };
-
-  const getRiskColor = (risk: string) => {
-    if (risk.includes('Low')) return 'text-green-400';
-    if (risk.includes('Medium')) return 'text-yellow-400';
-    return 'text-red-400';
+  const getDirectionColor = (direction: string) => {
+    return direction === 'buy' ? 'text-green-400' : 'text-red-400';
   };
 
   return (
     <Card className="bg-gray-800 border-gray-700">
       <CardHeader>
-        <CardTitle className="text-purple-400 flex items-center justify-between">
-          🤖 AI Trading Signals
-          <div className="flex space-x-2">
-            <Button 
-              onClick={() => setAutoRefresh(!autoRefresh)}
-              size="sm"
-              variant={autoRefresh ? "default" : "outline"}
-            >
-              {autoRefresh ? '🔄 Auto' : '⏸️ Manual'}
-            </Button>
-            <Button 
-              onClick={fetchSignals} 
-              disabled={loading}
-              size="sm"
-              variant="outline"
-            >
-              {loading ? 'Laddar...' : 'Uppdatera'}
-            </Button>
-          </div>
+        <CardTitle className="text-green-400 flex items-center justify-between">
+          🤖 AI Trading Signaler
+          <Button 
+            onClick={fetchSignals} 
+            disabled={loading}
+            size="sm"
+            variant="outline"
+          >
+            {loading ? 'Uppdaterar...' : 'Uppdatera'}
+          </Button>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {signalData ? (
+        {signals.length > 0 ? (
           <div className="space-y-4">
-            {/* Performance Summary */}
-            <div className="grid grid-cols-4 gap-3 mb-6">
-              <div className="bg-gray-700 p-3 rounded text-center">
-                <div className="text-lg font-bold text-white">{signalData.performance.total_signals}</div>
-                <div className="text-xs text-gray-400">Totala Signaler</div>
-              </div>
-              <div className="bg-gray-700 p-3 rounded text-center">
-                <div className="text-lg font-bold text-purple-400">
-                  {signalData.performance.avg_confidence.toFixed(1)}%
-                </div>
-                <div className="text-xs text-gray-400">Snitt Säkerhet</div>
-              </div>
-              <div className="bg-gray-700 p-3 rounded text-center">
-                <div className="text-lg font-bold text-green-400">{signalData.performance.buy_signals}</div>
-                <div className="text-xs text-gray-400">Köp</div>
-              </div>
-              <div className="bg-gray-700 p-3 rounded text-center">
-                <div className="text-lg font-bold text-red-400">{signalData.performance.sell_signals}</div>
-                <div className="text-xs text-gray-400">Sälj</div>
-              </div>
-            </div>
-
-            {/* Signal List */}
-            <div className="space-y-3">
-              {signalData.signals.length > 0 ? (
-                signalData.signals.map((signal, index) => (
-                  <div 
-                    key={index}
-                    className="bg-gray-700 p-4 rounded-lg border-l-4 border-purple-500"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-3">
-                        <div className="flex items-center space-x-2">
-                          {getDirectionIcon(signal.direction)}
-                          <span className="font-bold text-white text-lg">
-                            {signal.coin}
-                          </span>
-                        </div>
-                        <Badge className={`${getConfidenceColor(signal.confidence)} text-white`}>
-                          {signal.confidence}% säkerhet
-                        </Badge>
-                      </div>
-                      <Button 
-                        onClick={() => onExecuteSignal?.(signal)}
-                        size="sm"
-                        className={signal.direction === 'buy' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
-                      >
-                        {signal.direction === 'buy' ? '📈 KÖP' : '📉 SÄLJ'}
-                      </Button>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <div className="text-gray-400">Nuvarande Pris</div>
-                        <div className="text-white font-mono">${signal.current_price}</div>
-                      </div>
-                      <div>
-                        <div className="text-gray-400">Målpris</div>
-                        <div className="text-white font-mono">${signal.target_price}</div>
-                      </div>
-                      <div>
-                        <div className="text-gray-400">Risknivå</div>
-                        <div className={getRiskColor(signal.risk_level)}>{signal.risk_level}</div>
-                      </div>
-                      <div>
-                        <div className="text-gray-400">Tidsram</div>
-                        <div className="text-white">{signal.timeframe}</div>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 text-xs text-gray-400">
-                      Genererad: {new Date(signal.timestamp).toLocaleString('sv-SE')}
-                    </div>
+            {signals.map((signal, index) => (
+              <div 
+                key={index}
+                className="bg-gray-700 p-4 rounded-lg border border-gray-600"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <h4 className="text-white font-medium">{signal.coin}</h4>
+                    <Badge variant="outline" className="text-gray-300">
+                      {signal.symbol}
+                    </Badge>
                   </div>
-                ))
-              ) : (
-                <div className="text-center py-8">
-                  <TrendingUp className="w-12 h-12 text-gray-500 mx-auto mb-3" />
-                  <div className="text-gray-400">Inga signaler just nu</div>
-                  <div className="text-gray-500 text-sm">Analyserar marknadsförhållanden...</div>
+                  <Badge className={getConfidenceColor(signal.confidence)}>
+                    {signal.confidence}% Säkerhet
+                  </Badge>
                 </div>
-              )}
-            </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-3 text-sm">
+                  <div>
+                    <span className="text-gray-400">Riktning: </span>
+                    <span className={`font-bold ${getDirectionColor(signal.direction)}`}>
+                      {signal.direction.toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Nuvarande: </span>
+                    <span className="text-white">${signal.current_price}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Mål: </span>
+                    <span className="text-white">${signal.target_price}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Tidsram: </span>
+                    <span className="text-white">{signal.timeframe}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400">{signal.risk_level}</span>
+                  <Button 
+                    onClick={() => handleExecuteSignal(signal)}
+                    size="sm"
+                    className={signal.direction === 'buy' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
+                  >
+                    {signal.direction === 'buy' ? '📈 KÖP' : '📉 SÄLJ'}
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="text-center py-8">
             <div className="text-gray-400">
-              {loading ? 'Genererar AI-signaler...' : 'Ingen data tillgänglig'}
+              {loading ? 'Analyserar marknadsförhållanden...' : 'Inga AI-signaler tillgängliga'}
             </div>
           </div>
         )}

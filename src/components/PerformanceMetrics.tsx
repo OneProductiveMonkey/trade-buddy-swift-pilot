@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { tradingApi } from '@/services/tradingApi';
 
 interface PerformanceData {
   metrics: {
@@ -21,9 +22,7 @@ export const PerformanceMetrics: React.FC = () => {
 
   const fetchPerformance = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/performance_summary');
-      if (!response.ok) throw new Error('Failed to fetch performance');
-      const data = await response.json();
+      const data = await tradingApi.getPerformanceSummary();
       setPerformance(data);
       
       // Update chart data
