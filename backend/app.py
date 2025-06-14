@@ -1,4 +1,3 @@
-
 """
 Enhanced Flask application with modular structure
 """
@@ -286,6 +285,54 @@ def execute_enhanced_trade():
     except Exception as e:
         logger.error(f"Trade execution error: {e}")
         return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/send_notification', methods=['POST'])
+def send_notification():
+    """Send email notification"""
+    try:
+        data = request.json
+        email = data.get('email')
+        notification = data.get('notification')
+        
+        # Here you would integrate with an email service like SendGrid, Mailgun, etc.
+        # For now, just log the notification
+        logger.info(f"Email notification to {email}: {notification['title']}")
+        
+        return jsonify({'success': True, 'message': 'Notification sent'})
+        
+    except Exception as e:
+        logger.error(f"Notification error: {e}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/auto_mode_status')
+def get_auto_mode_status():
+    """Get auto mode status and decision history"""
+    # Mock data - replace with real implementation
+    decisions = [
+        {
+            'timestamp': datetime.now().isoformat(),
+            'recommended_strategy': 'arbitrage',
+            'confidence': 85,
+            'reasoning': 'Hög spread upptäckt mellan Binance och KuCoin för BTC/USDT',
+            'market_conditions': {
+                'volatility': 0.3,
+                'trend_strength': 0.7,
+                'arbitrage_opportunities': 3,
+                'ai_signal_strength': 0.6
+            },
+            'action_taken': 'Executed arbitrage trade for $500',
+            'result': {
+                'profit': 12.50,
+                'success': True
+            }
+        }
+    ]
+    
+    return jsonify({
+        'active': trading_core.is_active,
+        'current_strategy': 'arbitrage',
+        'decisions': decisions
+    })
 
 if __name__ == '__main__':
     logger.info("🚀 Starting Enhanced Trading Bot Server")

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { TradingDashboard } from '@/components/TradingDashboard';
 import { Portfolio } from '@/components/Portfolio';
@@ -7,6 +6,11 @@ import { MarketData } from '@/components/MarketData';
 import { TradingHistory } from '@/components/TradingHistory';
 import { EnhancedTradingBot } from '@/components/EnhancedTradingBot';
 import { useToast } from '@/hooks/use-toast';
+import { WalletConnection } from '@/components/WalletConnection';
+import { TrendingCoins } from '@/components/TrendingCoins';
+import { TradeReplay } from '@/components/TradeReplay';
+import { AutoModeStatus } from '@/components/AutoModeStatus';
+import { notificationService } from '@/services/notificationService';
 
 const Index = () => {
   const [balance, setBalance] = useState(10000);
@@ -84,6 +88,11 @@ const Index = () => {
     });
   };
 
+  // Request notification permission on component mount
+  useEffect(() => {
+    notificationService.requestPermission();
+  }, []);
+
   // Update portfolio stats to include bot performance
   const totalProfit = botProfit;
   const totalValue = balance + positions.reduce((sum, pos) => sum + (pos.amount * pos.price), 0);
@@ -112,6 +121,17 @@ const Index = () => {
             isActive={botActive}
             onToggleActive={toggleBot}
           />
+        </div>
+
+        {/* New Features Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <WalletConnection />
+          <AutoModeStatus />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <TrendingCoins />
+          <TradeReplay />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
