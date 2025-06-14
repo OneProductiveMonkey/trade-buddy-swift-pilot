@@ -3,6 +3,25 @@ import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
 import { ethers } from 'ethers';
 
+// Type declarations for browser wallet extensions
+declare global {
+  interface Window {
+    solana?: {
+      isPhantom?: boolean;
+      connect: () => Promise<{ publicKey: PublicKey }>;
+      disconnect: () => Promise<void>;
+      on: (event: string, callback: () => void) => void;
+      request: (args: { method: string }) => Promise<any>;
+    };
+    ethereum?: {
+      isMetaMask?: boolean;
+      request: (args: { method: string; params?: any[] }) => Promise<any>;
+      on: (event: string, callback: (...args: any[]) => void) => void;
+      removeListener: (event: string, callback: (...args: any[]) => void) => void;
+    };
+  }
+}
+
 export interface WalletInfo {
   address: string;
   balance: number;
