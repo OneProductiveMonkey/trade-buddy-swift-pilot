@@ -94,7 +94,7 @@ export const EnhancedTradingBot: React.FC<{
     );
   }
 
-  const isConnected = botStatus?.connection_status?.active_exchanges > 0;
+  const isConnected = (botStatus?.connection_status?.active_exchanges || 0) > 0;
 
   return (
     <div className="space-y-4">
@@ -111,7 +111,7 @@ export const EnhancedTradingBot: React.FC<{
               <div>
                 <span className="text-white font-medium">
                   {isConnected ? 
-                    `${t('connection.connected').replace('{count}', botStatus?.connection_status?.active_exchanges || 0)}` :
+                    `${t('connection.connected')} ${botStatus?.connection_status?.active_exchanges || 0}` :
                     `Demo Mode - ${botStatus?.connection_status?.demo_exchanges || 0} exchanges`
                   }
                 </span>
