@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,7 +39,7 @@ export const TradingEngine: React.FC<TradingEngineProps> = ({ onTrade, balance }
   const [tradingConfig, setTradingConfig] = useState({
     budget: 25,
     strategy: 'arbitrage',
-    riskLevel: 'medium'
+    risk_level: 'medium'
   });
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -305,8 +304,8 @@ export const TradingEngine: React.FC<TradingEngineProps> = ({ onTrade, balance }
                 Risk Nivå
               </label>
               <select
-                value={tradingConfig.riskLevel}
-                onChange={(e) => setTradingConfig({...tradingConfig, riskLevel: e.target.value})}
+                value={tradingConfig.risk_level}
+                onChange={(e) => setTradingConfig({...tradingConfig, risk_level: e.target.value})}
                 className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white"
               >
                 <option value="low">🟢 Låg Risk</option>
