@@ -110,7 +110,7 @@ class WalletService {
   private async getSolanaBalance(publicKey: PublicKey): Promise<number> {
     try {
       const balance = await this.solanaConnection.getBalance(publicKey);
-      return balance / 1e9;
+      return balance / 1e9; // Convert lamports to SOL
     } catch (error) {
       console.error('Misslyckades att hämta SOL saldo:', error);
       return 0;
@@ -163,11 +163,16 @@ class WalletService {
       return { connected: false };
     }
 
-    if (window.ethereum.selectedAddress && window.ethereum.isConnected()) {
-      return {
-        connected: true,
-        address: window.ethereum.selectedAddress
-      };
+    try {
+      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+      if (accounts && accounts.length > 0) {
+        return {
+          connected: true,
+          address: accounts[0]
+        };
+      }
+    } catch (error) {
+      console.error('MetaMask status check failed:', error);
     }
 
     return { connected: false };

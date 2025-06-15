@@ -10,22 +10,19 @@ export const WalletConnection: React.FC = () => {
   const [phantomWallet, setPhantomWallet] = useState<WalletInfo | null>(null);
   const [metamaskWallet, setMetamaskWallet] = useState<WalletInfo | null>(null);
   const [connecting, setConnecting] = useState<string | null>(null);
-  const [walletStatus, setWalletStatus] = useState({ phantom: false, metamask: false });
+  const [refreshing, setRefreshing] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Check wallet status on component mount
   useEffect(() => {
     checkWalletStatus();
-    const interval = setInterval(checkWalletStatus, 5000);
+    const interval = setInterval(checkWalletStatus, 10000);
     return () => clearInterval(interval);
   }, []);
 
   const checkWalletStatus = async () => {
     try {
       const status = await walletService.getWalletReadyStatus();
-      setWalletStatus(status);
 
-      // Auto-connect if wallets are already connected
       if (status.phantom && !phantomWallet) {
         const phantomStatus = await walletService.getPhantomStatus();
         if (phantomStatus.connected && phantomStatus.address) {
@@ -62,7 +59,7 @@ export const WalletConnection: React.FC = () => {
         setPhantomWallet(wallet);
         toast({
           title: "✅ Phantom Ansluten",
-          description: `Adress: ${wallet.address.substring(0, 8)}...${wallet.address.substring(-4)} | Saldo: ${wallet.balance.toFixed(4)} SOL`,
+          description: `${wallet.address.substring(0, 8)}...${wallet.address.substring(-4)} | ${wallet.balance.toFixed(4)} SOL`,
         });
       }
     } catch (error: any) {
@@ -85,7 +82,7 @@ export const WalletConnection: React.FC = () => {
         setMetamaskWallet(wallet);
         toast({
           title: "✅ MetaMask Ansluten",
-          description: `Adress: ${wallet.address.substring(0, 8)}...${wallet.address.substring(-4)} | Saldo: ${wallet.balance.toFixed(4)} ETH`,
+          description: `${wallet.address.substring(0, 8)}...${wallet.address.substring(-4)} | ${wallet.balance.toFixed(4)} ETH`,
         });
       }
     } catch (error: any) {
@@ -113,20 +110,23 @@ export const WalletConnection: React.FC = () => {
   };
 
   const refreshWallet = async (type: 'phantom' | 'metamask') => {
-    if (type === 'phantom' && phantomWallet) {
-      try {
+    setRefreshing(type);
+    try {
+      if (type === 'phantom') {
         const wallet = await walletService.connectPhantom();
         if (wallet) setPhantomWallet(wallet);
-      } catch (error) {
-        console.error('Refresh Phantom failed:', error);
-      }
-    } else if (type === 'metamask' && metamaskWallet) {
-      try {
+      } else {
         const wallet = await walletService.connectMetaMask();
         if (wallet) setMetamaskWallet(wallet);
-      } catch (error) {
-        console.error('Refresh MetaMask failed:', error);
       }
+      toast({
+        title: "🔄 Uppdaterat",
+        description: `${type === 'phantom' ? 'Phantom' : 'MetaMask'} saldo uppdaterat`,
+      });
+    } catch (error) {
+      console.error(`Refresh ${type} failed:`, error);
+    } finally {
+      setRefreshing(null);
     }
   };
 
@@ -167,8 +167,9 @@ export const WalletConnection: React.FC = () => {
             <div className="text-sm text-gray-400 break-all">
               <span className="text-green-400">●</span> {wallet.address}
             </div>
-            <div className="text-sm text-gray-400">
-              Saldo: <span className="text-green-400 font-mono">{wallet.balance.toFixed(6)} {type === 'phantom' ? 'SOL' : 'ETH'}</span>
+            <div className="text-lg font-mono">
+              <span className="text-green-400">{wallet.balance.toFixed(6)}</span>
+              <span className="text-gray-400 ml-2">{type === 'phantom' ? 'SOL' : 'ETH'}</span>
             </div>
             <div className="text-sm text-gray-400">
               Nätverk: <span className="text-blue-400">{wallet.network}</span>
@@ -178,9 +179,10 @@ export const WalletConnection: React.FC = () => {
                 onClick={onRefresh} 
                 variant="outline" 
                 size="sm"
+                disabled={refreshing === type}
                 className="flex-1 border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
               >
-                🔄 Uppdatera
+                {refreshing === type ? '🔄 Uppdaterar...' : '🔄 Uppdatera'}
               </Button>
               <Button 
                 onClick={onDisconnect} 
@@ -207,6 +209,8 @@ export const WalletConnection: React.FC = () => {
       </CardContent>
     </Card>
   );
+
+  const totalBalance = (phantomWallet?.balance || 0) * 150 + (metamaskWallet?.balance || 0) * 3500; // Rough USD conversion
 
   return (
     <Card className="bg-gray-800/30 border-gray-700/50 backdrop-blur-sm">
@@ -241,17 +245,23 @@ export const WalletConnection: React.FC = () => {
           />
         </div>
 
-        {/* Status Summary */}
+        {/* Enhanced Status Summary */}
         <div className="mt-4 p-3 bg-gray-700/50 rounded-lg">
-          <div className="text-sm font-medium text-white mb-2">Wallet Status</div>
-          <div className="flex items-center space-x-4 text-xs">
-            <div className={`flex items-center space-x-1 ${phantomWallet?.isConnected ? 'text-green-400' : 'text-gray-400'}`}>
-              <div className={`w-2 h-2 rounded-full ${phantomWallet?.isConnected ? 'bg-green-400' : 'bg-gray-400'}`}></div>
-              <span>Phantom {phantomWallet?.isConnected ? 'Ready' : 'Not Connected'}</span>
+          <div className="text-sm font-medium text-white mb-2">Wallet Översikt</div>
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-400">Total uppskattad värde:</span>
+              <span className="text-green-400 font-mono">${totalBalance.toFixed(2)}</span>
             </div>
-            <div className={`flex items-center space-x-1 ${metamaskWallet?.isConnected ? 'text-green-400' : 'text-gray-400'}`}>
-              <div className={`w-2 h-2 rounded-full ${metamaskWallet?.isConnected ? 'bg-green-400' : 'bg-gray-400'}`}></div>
-              <span>MetaMask {metamaskWallet?.isConnected ? 'Ready' : 'Not Connected'}</span>
+            <div className="flex items-center space-x-4 text-xs">
+              <div className={`flex items-center space-x-1 ${phantomWallet?.isConnected ? 'text-green-400' : 'text-gray-400'}`}>
+                <div className={`w-2 h-2 rounded-full ${phantomWallet?.isConnected ? 'bg-green-400' : 'bg-gray-400'}`}></div>
+                <span>Phantom {phantomWallet?.isConnected ? `(${phantomWallet.balance.toFixed(2)} SOL)` : 'Ej ansluten'}</span>
+              </div>
+              <div className={`flex items-center space-x-1 ${metamaskWallet?.isConnected ? 'text-green-400' : 'text-gray-400'}`}>
+                <div className={`w-2 h-2 rounded-full ${metamaskWallet?.isConnected ? 'bg-green-400' : 'bg-gray-400'}`}></div>
+                <span>MetaMask {metamaskWallet?.isConnected ? `(${metamaskWallet.balance.toFixed(4)} ETH)` : 'Ej ansluten'}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -262,10 +272,10 @@ export const WalletConnection: React.FC = () => {
               <span className="text-green-400">✅</span>
               <div>
                 <div className="text-green-400 text-sm font-medium">
-                  Wallets Anslutna
+                  Wallets Konfigurerade
                 </div>
                 <div className="text-green-300 text-xs">
-                  Trading bot kan nu genomföra transaktioner med riktiga saldon
+                  Trading bot kan nu använda riktiga wallet-saldon för trading
                 </div>
               </div>
             </div>
