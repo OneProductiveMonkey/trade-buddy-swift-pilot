@@ -9,7 +9,6 @@ import uvicorn
 import logging
 import sys
 import os
-from main import app, bot
 
 # Configure logging
 logging.basicConfig(
@@ -38,6 +37,9 @@ def main():
     logger.info("🔄 Starting FastAPI server on http://localhost:5000")
     
     try:
+        # Import main app here to avoid circular imports
+        from main import app
+        
         uvicorn.run(
             app,
             host="0.0.0.0",

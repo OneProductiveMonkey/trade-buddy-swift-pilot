@@ -1,6 +1,5 @@
 
-import { Connection, PublicKey, Transaction } from '@solana/web3.js';
-import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
+import { Connection, PublicKey } from '@solana/web3.js';
 import { ethers } from 'ethers';
 
 // Type declarations for browser wallet extensions
@@ -30,13 +29,11 @@ export interface WalletInfo {
 }
 
 class WalletService {
-  private phantomAdapter: PhantomWalletAdapter | null = null;
-  private metamaskProvider: any = null;
   private solanaConnection: Connection;
 
   constructor() {
-    // Use devnet for testing
-    this.solanaConnection = new Connection('https://api.devnet.solana.com');
+    // Use mainnet for live trading
+    this.solanaConnection = new Connection('https://api.mainnet-beta.solana.com');
   }
 
   // Check if we're in browser environment
@@ -44,60 +41,60 @@ class WalletService {
     return typeof window !== 'undefined';
   }
 
-  // Phantom Wallet Integration
+  // Phantom Wallet Integration with live connection
   async connectPhantom(): Promise<WalletInfo | null> {
     try {
       if (!this.isBrowser()) {
-        throw new Error('Phantom endast tillgänglig i webbläsare');
+        throw new Error('Phantom only available in browser');
       }
 
       if (!window.solana?.isPhantom) {
-        // Open Phantom download page
         window.open('https://phantom.app/', '_blank');
-        throw new Error('Phantom wallet inte installerad. Installationssida öppnad.');
+        throw new Error('Phantom wallet not installed. Opening installation page.');
       }
 
       const response = await window.solana.connect();
       const publicKey = response.publicKey;
       
-      if (!publicKey) throw new Error('Ingen publik nyckel från Phantom');
+      if (!publicKey) throw new Error('No public key from Phantom');
 
+      // Get live balance from Solana mainnet
       const balance = await this.solanaConnection.getBalance(publicKey);
 
       return {
         address: publicKey.toString(),
         balance: balance / 1e9, // Convert lamports to SOL
-        network: 'solana-devnet',
+        network: 'solana-mainnet',
         type: 'phantom'
       };
     } catch (error: any) {
       console.error('Phantom connection error:', error);
-      throw new Error(error.message || 'Phantom anslutning misslyckades');
+      throw new Error(error.message || 'Phantom connection failed');
     }
   }
 
-  // MetaMask Integration
+  // MetaMask Integration with live connection
   async connectMetaMask(): Promise<WalletInfo | null> {
     try {
       if (!this.isBrowser()) {
-        throw new Error('MetaMask endast tillgänglig i webbläsare');
+        throw new Error('MetaMask only available in browser');
       }
 
       if (!window.ethereum) {
         window.open('https://metamask.io/download/', '_blank');
-        throw new Error('MetaMask inte installerad. Installationssida öppnad.');
+        throw new Error('MetaMask not installed. Opening installation page.');
       }
 
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
       if (!accounts || accounts.length === 0) {
-        throw new Error('Inga konton tillgängliga i MetaMask');
+        throw new Error('No accounts available in MetaMask');
       }
 
-      this.metamaskProvider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await this.metamaskProvider.getSigner();
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
       const address = await signer.getAddress();
-      const balance = await this.metamaskProvider.getBalance(address);
-      const network = await this.metamaskProvider.getNetwork();
+      const balance = await provider.getBalance(address);
+      const network = await provider.getNetwork();
 
       return {
         address,
@@ -107,15 +104,14 @@ class WalletService {
       };
     } catch (error: any) {
       console.error('MetaMask connection error:', error);
-      throw new Error(error.message || 'MetaMask anslutning misslyckades');
+      throw new Error(error.message || 'MetaMask connection failed');
     }
   }
 
   async disconnectWallet(type: 'phantom' | 'metamask') {
     try {
-      if (type === 'phantom' && this.phantomAdapter) {
-        await this.phantomAdapter.disconnect();
-        this.phantomAdapter = null;
+      if (type === 'phantom' && window.solana) {
+        await window.solana.disconnect();
       }
       // MetaMask doesn't have programmatic disconnect
     } catch (error) {
