@@ -14,17 +14,16 @@ import logging
 import asyncio
 from datetime import datetime
 
-# Import all core modules
-from ..core.engine import engine, TradingMode, StrategyType
-from ..core.data import data_fetcher
-from ..core.replay import trade_replay
-from ..core.notify import notification_manager
-from ..strategies.ai import AIStrategy
-from ..strategies.arbitrage import ArbitrageStrategy
-from ..strategies.auto import auto_engine
-from ..strategies.meme import meme_radar
-from ..wallets.metamask import metamask_wallet
-from ..wallets.phantom import phantom_wallet
+# Import all core modules with correct paths
+from core.engine import engine, TradingMode, StrategyType
+from strategies.ai import AIStrategy
+from strategies.arbitrage import ArbitrageStrategy
+from strategies.auto import auto_engine
+from strategies.meme import meme_radar
+from wallets.metamask import metamask_wallet
+from wallets.phantom import phantom_wallet
+from core.notify import notification_manager
+from core.replay import trade_replay
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +42,7 @@ class TradeRequest(BaseModel):
     confidence: Optional[float] = 50.0
 
 class WalletConnectRequest(BaseModel):
-    wallet_type: str  # "metamask" or "phantom"
+    wallet_type: str
     address: str
     network: Optional[str] = None
 
@@ -60,7 +59,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify actual domains
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -76,17 +75,6 @@ async def startup_event():
         logger.info("✅ Enhanced Trading Bot API ready")
     except Exception as e:
         logger.error(f"Startup error: {e}")
-
-# Shutdown event
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
-    try:
-        await engine.stop()
-        await data_fetcher.close()
-        logger.info("🛑 Enhanced Trading Bot API stopped")
-    except Exception as e:
-        logger.error(f"Shutdown error: {e}")
 
 # Health check
 @app.get("/health")
@@ -183,10 +171,7 @@ async def get_enhanced_status():
 async def get_auto_mode_status():
     """Get auto mode status and recommendations"""
     try:
-        # Analyze current market conditions
         analysis = await auto_engine.analyze_market_conditions(engine.market_data)
-        
-        # Get strategy recommendation
         strategy, confidence, reason = await auto_engine.select_optimal_strategy(analysis)
         
         return {
@@ -243,10 +228,7 @@ async def get_meme_radar():
 async def get_trade_replay():
     """Get trade replay timeline and analytics"""
     try:
-        # Get trade timeline
         trade_timeline = await trade_replay.get_trade_timeline(50)
-        
-        # Get performance metrics
         performance = await trade_replay.get_performance_metrics(7)
         
         return {
@@ -304,51 +286,7 @@ async def get_wallet_status():
         logger.error(f"Wallet status error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/wallet/disconnect/{wallet_type}")
-async def disconnect_wallet(wallet_type: str):
-    """Disconnect specified wallet"""
-    try:
-        if wallet_type.lower() == "metamask":
-            await metamask_wallet.disconnect()
-        elif wallet_type.lower() == "phantom":
-            await phantom_wallet.disconnect()
-        else:
-            raise HTTPException(status_code=400, detail="Invalid wallet type")
-        
-        return {"success": True, "message": f"{wallet_type} disconnected"}
-    except Exception as e:
-        logger.error(f"Wallet disconnect error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# Notification endpoints
-@app.post("/api/notifications/webhook")
-async def add_webhook(request: WebhookRequest):
-    """Add webhook URL for notifications"""
-    try:
-        success = notification_manager.add_webhook(request.url)
-        
-        return {
-            "success": success,
-            "message": "Webhook added successfully" if success else "Failed to add webhook",
-            "webhook_status": notification_manager.get_webhook_status()
-        }
-    except Exception as e:
-        logger.error(f"Add webhook error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/notifications/status")
-async def get_notification_status():
-    """Get notification system status"""
-    try:
-        return {
-            "webhook_status": notification_manager.get_webhook_status(),
-            "recent_notifications": notification_manager.get_notification_history(10)
-        }
-    except Exception as e:
-        logger.error(f"Notification status error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# Keep existing endpoints...
+# Trading control endpoints
 @app.post("/api/start_enhanced_trading")
 async def start_enhanced_trading(config: TradingConfig):
     """Start enhanced trading with configuration"""
@@ -372,11 +310,6 @@ async def start_enhanced_trading(config: TradingConfig):
         if not engine.is_running:
             await engine.start()
         
-        # Send notification
-        await notification_manager.send_strategy_change_notification(
-            "manual", config.strategy, 100, f"Trading started with ${config.budget} budget"
-        )
-        
         logger.info(f"🚀 Trading started - Budget: ${config.budget}, Strategy: {config.strategy}")
         
         return {
@@ -393,7 +326,6 @@ async def start_enhanced_trading(config: TradingConfig):
         logger.error(f"Start trading error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Keep other existing endpoints but enhance with notification calls...
 @app.post("/api/stop_enhanced_trading")
 async def stop_enhanced_trading():
     """Stop enhanced trading"""
@@ -405,7 +337,34 @@ async def stop_enhanced_trading():
         logger.error(f"Stop trading error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# ... keep existing code (execute_enhanced_trade, etc.) ...
+@app.post("/api/execute_enhanced_trade")
+async def execute_enhanced_trade(request: TradeRequest):
+    """Execute enhanced trade with validation"""
+    try:
+        # Create a trade signal for execution
+        from core.engine import TradeSignal, StrategyType
+        
+        signal = TradeSignal(
+            symbol=request.symbol,
+            direction=request.side,
+            confidence=request.confidence,
+            price=43000.0,  # Demo price
+            target_price=43500.0,  # Demo target
+            strategy=StrategyType.AI_SIGNALS,
+            timestamp=datetime.now(),
+            risk_level="medium"
+        )
+        
+        await engine._execute_signal(signal)
+        
+        return {
+            "success": True,
+            "message": f"✅ {request.side.upper()} ${request.amount_usd} {request.symbol} executed successfully"
+        }
+        
+    except Exception as e:
+        logger.error(f"Enhanced trade execution error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

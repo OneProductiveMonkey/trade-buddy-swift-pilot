@@ -22,9 +22,9 @@ class TradingConfig:
     MAX_TRADE_AMOUNT: float = 1000.0
     DEFAULT_RISK_LEVEL: str = "medium"
     
-    # Exchange API Keys (demo mode for now)
-    BINANCE_API_KEY: str = ""
-    BINANCE_SECRET: str = ""
+    # Exchange API Keys
+    BINANCE_API_KEY: str = "Neyube4xusslnwpAqM7IaiphFvPqDL8oX0S7fOx2Q3Npiq7eKSGQKJnzvJTQ5jok"
+    BINANCE_SECRET: str = "KOWSrvPvlqv8C2UyKO0pGUZjPXPSi0FPobOdlsRRnHZcm2Q0SeHSjhatPeWzlmJa"
     COINBASE_API_KEY: str = ""
     COINBASE_SECRET: str = ""
     
@@ -81,11 +81,11 @@ def load_config() -> TradingConfig:
     config.MIN_TRADE_AMOUNT = float(os.getenv('MIN_TRADE_AMOUNT', config.MIN_TRADE_AMOUNT))
     config.MAX_TRADE_AMOUNT = float(os.getenv('MAX_TRADE_AMOUNT', config.MAX_TRADE_AMOUNT))
     
-    # API Keys
-    config.BINANCE_API_KEY = os.getenv('BINANCE_API_KEY', '')
-    config.BINANCE_SECRET = os.getenv('BINANCE_SECRET', '')
-    config.COINBASE_API_KEY = os.getenv('COINBASE_API_KEY', '')
-    config.COINBASE_SECRET = os.getenv('COINBASE_SECRET', '')
+    # API Keys - use defaults from config if not in environment
+    config.BINANCE_API_KEY = os.getenv('BINANCE_API_KEY', config.BINANCE_API_KEY)
+    config.BINANCE_SECRET = os.getenv('BINANCE_SECRET', config.BINANCE_SECRET)
+    config.COINBASE_API_KEY = os.getenv('COINBASE_API_KEY', config.COINBASE_API_KEY)
+    config.COINBASE_SECRET = os.getenv('COINBASE_SECRET', config.COINBASE_SECRET)
     
     # Database
     config.DATABASE_URL = os.getenv('DATABASE_URL', config.DATABASE_URL)

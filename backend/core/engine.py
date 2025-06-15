@@ -86,11 +86,10 @@ class BotEngine:
         """Background task to monitor prices"""
         while self.is_running:
             try:
-                from .data import DataFetcher
-                fetcher = DataFetcher()
+                from .data import data_fetcher
                 
                 # Update market data
-                self.market_data = await fetcher.get_all_prices()
+                self.market_data = await data_fetcher.get_all_prices()
                 self.last_update = datetime.now()
                 
                 await asyncio.sleep(5)  # Update every 5 seconds
@@ -128,7 +127,7 @@ class BotEngine:
                 
                 # Update 24h profit (simulation)
                 if len(self.trade_history) > 0:
-                    recent_trades = [t for t in self.trade_history if (datetime.now() - t['timestamp']).hours < 24]
+                    recent_trades = [t for t in self.trade_history if (datetime.now() - t['timestamp']).total_seconds() < 86400]
                     self.portfolio.profit_24h = sum(t.get('profit', 0) for t in recent_trades)
                 
                 await asyncio.sleep(30)  # Update every 30 seconds
@@ -140,7 +139,7 @@ class BotEngine:
     async def _run_ai_strategy(self):
         """Run AI-based trading strategy"""
         try:
-            from ..strategies.ai import AIStrategy
+            from strategies.ai import AIStrategy
             ai = AIStrategy()
             
             signals = await ai.generate_signals(self.market_data)
@@ -155,7 +154,7 @@ class BotEngine:
     async def _run_arbitrage_strategy(self):
         """Run arbitrage strategy"""
         try:
-            from ..strategies.arbitrage import ArbitrageStrategy
+            from strategies.arbitrage import ArbitrageStrategy
             arb = ArbitrageStrategy()
             
             opportunities = await arb.find_opportunities(self.market_data)
