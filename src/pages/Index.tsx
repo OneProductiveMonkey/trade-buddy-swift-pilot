@@ -12,8 +12,13 @@ import { TrendingCoins } from '@/components/TrendingCoins';
 import { TradeReplay } from '@/components/TradeReplay';
 import { AutoModeStatus } from '@/components/AutoModeStatus';
 import { MemeRadarPanel } from '@/components/MemeRadarPanel';
+import { LanguageSettings } from '@/components/LanguageSettings';
 import { notificationService } from '@/services/notificationService';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Settings, Activity, TrendingUp, Bot } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const Index = () => {
   const [balance, setBalance] = useState(10000);
@@ -21,20 +26,21 @@ const Index = () => {
   const [botActive, setBotActive] = useState(false);
   const [botProfit, setBotProfit] = useState(0);
   const [sandboxMode, setSandboxMode] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   const handleTrade = (order) => {
     console.log('Executing trade:', order);
     
-    // Enhanced trade execution with strategy tracking
     const isBot = order.strategy === 'arbitrage' || order.strategy === 'ai_signal';
     
     if (order.type === 'buy') {
       const cost = order.amount * order.price;
       if (cost > balance) {
         toast({
-          title: "Otillräckligt saldo",
-          description: "Du har inte tillräckligt med medel för denna handel",
+          title: "Insufficient Balance",
+          description: "You don't have enough funds for this trade",
           variant: "destructive",
         });
         return;
@@ -43,14 +49,11 @@ const Index = () => {
     } else {
       const revenue = order.amount * order.price;
       
-      // Calculate profit for bot trades
       if (isBot && order.strategy === 'arbitrage') {
-        // Simulate arbitrage profit (0.3-1.8%)
         const profit = revenue * (0.003 + Math.random() * 0.015);
         setBotProfit(prev => prev + profit);
         setBalance(prev => prev + revenue + profit);
       } else if (isBot && order.strategy === 'ai_signal') {
-        // AI signal profit based on confidence
         const confidenceMultiplier = (order.confidence || 70) / 100;
         const profit = revenue * (Math.random() - 0.3) * 0.02 * confidenceMultiplier;
         setBotProfit(prev => prev + profit);
@@ -79,11 +82,10 @@ const Index = () => {
     const sandboxText = sandboxMode ? ' [SANDBOX]' : '';
     
     toast({
-      title: `Handel genomförd${strategyText}${sandboxText}`,
-      description: `${order.type.toUpperCase()} ${order.amount.toFixed(6)} ${order.symbol} för $${order.price}${exchangeText}`,
+      title: `Trade Executed${strategyText}${sandboxText}`,
+      description: `${order.type.toUpperCase()} ${order.amount.toFixed(6)} ${order.symbol} at $${order.price}${exchangeText}`,
     });
 
-    // Send notification
     notificationService.notifyTradeExecuted({
       ...order,
       sandbox: sandboxMode
@@ -93,86 +95,115 @@ const Index = () => {
   const toggleBot = () => {
     setBotActive(prev => !prev);
     toast({
-      title: botActive ? "Trading Bot Stoppad" : "Trading Bot Startad",
-      description: botActive ? "Automatisk handel har stoppats" : "Automatisk handel är nu aktiv",
+      title: botActive ? t('trading.stopped') : t('trading.active'),
+      description: botActive ? "Automatic trading stopped" : "Automatic trading is now active",
       variant: botActive ? "destructive" : "default",
     });
   };
 
-  // Request notification permission on component mount
   useEffect(() => {
     notificationService.requestPermission();
   }, []);
 
-  // Update portfolio stats to include bot performance
   const totalProfit = botProfit;
   const totalValue = balance + positions.reduce((sum, pos) => sum + (pos.amount * pos.price), 0);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
-      <div className="container mx-auto px-4 py-6">
-        <div className="mb-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-black">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-gray-800/50 to-gray-900/50 backdrop-blur-sm border-b border-gray-700/50">
+        <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent mb-2">
-                Advanced AI Trading Bot Pro
-              </h1>
-              <p className="text-gray-400">Multi-Exchange Arbitrage & AI Signal Trading Platform</p>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                  <Bot className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-green-400 bg-clip-text text-transparent">
+                    {t('app.title')}
+                  </h1>
+                  <p className="text-sm text-gray-400">{t('app.subtitle')}</p>
+                </div>
+              </div>
             </div>
             
-            {/* Sandbox Mode Indicator */}
-            {sandboxMode && (
-              <Badge variant="outline" className="text-orange-400 border-orange-400 text-lg px-4 py-2">
-                🧪 SANDBOX MODE
-              </Badge>
-            )}
-          </div>
-          
-          {botActive && (
-            <div className="mt-2 flex items-center text-green-400">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse mr-2"></div>
-              Bot profit: +${botProfit.toFixed(2)} {sandboxMode && '(Simulerat)'}
+            <div className="flex items-center space-x-3">
+              {sandboxMode && (
+                <Badge variant="outline" className="text-orange-400 border-orange-400 px-3 py-1">
+                  🧪 SANDBOX
+                </Badge>
+              )}
+              
+              {botActive && (
+                <div className="flex items-center text-green-400 bg-green-400/10 px-3 py-1 rounded-full">
+                  <Activity className="w-4 h-4 mr-2 animate-pulse" />
+                  <span className="text-sm font-medium">
+                    Bot: +${botProfit.toFixed(2)}
+                  </span>
+                </div>
+              )}
+              
+              <Button
+                onClick={() => setShowSettings(!showSettings)}
+                variant="outline"
+                size="sm"
+                className="border-gray-600 text-gray-300 hover:bg-gray-700"
+              >
+                <Settings className="w-4 h-4" />
+              </Button>
             </div>
-          )}
+          </div>
         </div>
+      </div>
+
+      <div className="container mx-auto px-6 py-6 space-y-6">
+        {/* Settings Panel */}
+        {showSettings && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <LanguageSettings />
+          </div>
+        )}
 
         {/* Enhanced Trading Bot Section */}
-        <div className="mb-6">
-          <EnhancedTradingBot 
-            onTrade={handleTrade}
-            balance={balance}
-            isActive={botActive}
-            onToggleActive={toggleBot}
-          />
-        </div>
+        <Card className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm border-gray-700/50 shadow-2xl">
+          <CardContent className="p-6">
+            <EnhancedTradingBot 
+              onTrade={handleTrade}
+              balance={balance}
+              isActive={botActive}
+              onToggleActive={toggleBot}
+            />
+          </CardContent>
+        </Card>
 
-        {/* New Enhanced Features Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <AutoModeStatus />
-          <MemeRadarPanel />
-        </div>
+        {/* Main Dashboard Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Column - Status & Controls */}
+          <div className="lg:col-span-4 space-y-6">
+            <AutoModeStatus />
+            <MemeRadarPanel />
+            <WalletConnection />
+          </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <WalletConnection />
-          <TradeReplay />
-        </div>
+          {/* Center Column - Trading & Analytics */}
+          <div className="lg:col-span-5 space-y-6">
+            <TradingDashboard />
+            <TradeReplay />
+          </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <TrendingCoins />
-          <div className="space-y-6">
+          {/* Right Column - Portfolio & Orders */}
+          <div className="lg:col-span-3 space-y-6">
             <Portfolio balance={balance} positions={positions} />
             <OrderForm onTrade={handleTrade} />
+            <TrendingCoins />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <TradingDashboard />
-          </div>
-          <div className="space-y-6">
-            <MarketData />
-            <TradingHistory positions={positions} />
-          </div>
+        {/* Bottom Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <MarketData />
+          <TradingHistory positions={positions} />
         </div>
       </div>
     </div>
