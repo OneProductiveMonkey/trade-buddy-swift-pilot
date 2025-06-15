@@ -1,16 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { TradingHeader } from './TradingHeader';
-import { StatsGrid } from './StatsGrid';
-import { TradingControls } from './TradingControls';
-import { MarketAnalysisPanel } from './MarketAnalysisPanel';
-import { ArbitrageOpportunities } from './ArbitrageOpportunities';
+import { LiveStatusBar } from './LiveStatusBar';
+import { EnhancedWalletManager } from './EnhancedWalletManager';
+import { TradingEngine } from './TradingEngine';
 import { RealTimeTradeLog } from './RealTimeTradeLog';
-import { WalletConnection } from './WalletConnection';
 import { UserSettings } from './UserSettings';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { tradingApi } from '@/services/tradingApi';
 
 interface Portfolio {
@@ -41,7 +39,6 @@ export const ProfessionalDashboard: React.FC<ProfessionalDashboardProps> = ({
   });
   
   const [isActive, setIsActive] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -54,134 +51,89 @@ export const ProfessionalDashboard: React.FC<ProfessionalDashboardProps> = ({
     try {
       const data = await tradingApi.getEnhancedStatus();
       setPortfolio(data.portfolio);
+      setIsActive(data.trading_active || false);
     } catch (error) {
       console.error('Misslyckades att uppdatera data:', error);
-    }
-  };
-
-  const handleStartTrading = async (config: any) => {
-    try {
-      const result = await tradingApi.startEnhancedTrading(config);
-      if (result.success) {
-        setIsActive(true);
-        toast({
-          title: "Trading Startad",
-          description: `Bot aktiverad med $${config.budget} budget`,
-        });
-      } else {
-        toast({
-          title: "Misslyckades att starta",
-          description: result.message,
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Fel",
-        description: "Misslyckades att starta trading bot",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleStopTrading = async () => {
-    try {
-      await tradingApi.stopEnhancedTrading();
-      setIsActive(false);
-      toast({
-        title: "Trading Stoppad",
-        description: "Bot har inaktiverats",
-      });
-    } catch (error) {
-      toast({
-        title: "Fel",
-        description: "Misslyckades att stoppa trading bot",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const toggleActive = () => {
-    if (isActive) {
-      handleStopTrading();
-    } else {
-      setShowSettings(true);
     }
   };
 
   return (
     <div className="min-h-screen bg-black p-4">
       <div className="max-w-7xl mx-auto space-y-6">
-        <TradingHeader
-          isActive={isActive}
-          profit={portfolio.profit_live}
-          onToggleActive={toggleActive}
-          onSettings={() => setShowSettings(!showSettings)}
-        />
+        {/* Live Status Bar */}
+        <LiveStatusBar />
 
-        <StatsGrid portfolio={portfolio} />
-
-        <WalletConnection />
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-1">
-            <TradingControls
-              onStartTrading={handleStartTrading}
-              onStopTrading={handleStopTrading}
-              isActive={isActive}
-              balance={balance}
-            />
-          </div>
-
-          <div className="lg:col-span-2">
-            <Tabs defaultValue="analysis" className="w-full">
-              <TabsList className="grid w-full grid-cols-4 bg-gray-800 border-gray-700">
-                <TabsTrigger 
-                  value="analysis" 
-                  className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-                >
-                  Analys
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="arbitrage"
-                  className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-                >
-                  Arbitrage
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="trades"
-                  className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-                >
-                  Trades
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="settings"
-                  className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-                >
-                  Inställningar
-                </TabsTrigger>
-              </TabsList>
-              
-              <div className="mt-4">
-                <TabsContent value="analysis" className="mt-0">
-                  <MarketAnalysisPanel />
-                </TabsContent>
-                
-                <TabsContent value="arbitrage" className="mt-0">
-                  <ArbitrageOpportunities onExecute={(opp) => console.log('Arbitrage:', opp)} />
-                </TabsContent>
-                
-                <TabsContent value="trades" className="mt-0">
-                  <RealTimeTradeLog />
-                </TabsContent>
-                
-                <TabsContent value="settings" className="mt-0">
-                  <UserSettings />
-                </TabsContent>
+        {/* Main Dashboard Header */}
+        <Card className="bg-gray-900/50 border-gray-800">
+          <div className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-white mb-2">
+                  🚀 Professional Trading Dashboard
+                </h1>
+                <p className="text-gray-400">
+                  Multi-Exchange AI Trading Platform med Live Wallet Integration
+                </p>
               </div>
-            </Tabs>
+              <div className="flex items-center space-x-3">
+                <Badge className="bg-green-500 text-white">
+                  Testläge Aktivt
+                </Badge>
+                <Badge variant="outline" className="border-blue-500 text-blue-400">
+                  v2.0 Pro
+                </Badge>
+              </div>
+            </div>
           </div>
-        </div>
+        </Card>
+
+        {/* Main Content Tabs */}
+        <Tabs defaultValue="trading" className="w-full">
+          <TabsList className="grid w-full grid-cols-4 bg-gray-800 border-gray-700">
+            <TabsTrigger 
+              value="trading" 
+              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
+              🤖 Trading Engine
+            </TabsTrigger>
+            <TabsTrigger 
+              value="wallets"
+              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
+              👛 Wallets
+            </TabsTrigger>
+            <TabsTrigger 
+              value="trades"
+              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
+              📊 Trade Log
+            </TabsTrigger>
+            <TabsTrigger 
+              value="settings"
+              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
+              ⚙️ Inställningar
+            </TabsTrigger>
+          </TabsList>
+          
+          <div className="mt-6">
+            <TabsContent value="trading" className="mt-0">
+              <TradingEngine onTrade={onTrade} balance={balance} />
+            </TabsContent>
+            
+            <TabsContent value="wallets" className="mt-0">
+              <EnhancedWalletManager />
+            </TabsContent>
+            
+            <TabsContent value="trades" className="mt-0">
+              <RealTimeTradeLog />
+            </TabsContent>
+            
+            <TabsContent value="settings" className="mt-0">
+              <UserSettings />
+            </TabsContent>
+          </div>
+        </Tabs>
       </div>
     </div>
   );
