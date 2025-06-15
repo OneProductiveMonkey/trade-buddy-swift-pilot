@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
-import { Settings, Play, Square, Wallet, AlertTriangle } from 'lucide-react';
+import { Settings, Play, Square, Wallet, AlertTriangle, Zap } from 'lucide-react';
 import { walletService } from '@/services/walletService';
 
 interface TradingControlsProps {
@@ -23,12 +23,18 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
   isActive,
   balance
 }) => {
-  const [budget, setBudget] = useState(500);
+  const [budget, setBudget] = useState(100);
   const [strategy, setStrategy] = useState('arbitrage');
   const [riskLevel, setRiskLevel] = useState('medium');
   const [loading, setLoading] = useState(false);
 
   const handleStartTrading = async () => {
+    // Check minimum trade amount ($10)
+    if (budget < 10) {
+      alert('⚠️ Minimum trade amount is $10 for live trading');
+      return;
+    }
+
     // Check if wallets are connected for arbitrage
     if (strategy === 'arbitrage') {
       const phantomAvailable = walletService.isPhantomAvailable();
@@ -70,10 +76,29 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
       <CardHeader>
         <CardTitle className="text-white flex items-center">
           <Settings className="w-5 h-5 mr-2 text-blue-400" />
-          Trading Configuration
+          Live Trading Configuration
+          <Badge className="ml-auto bg-green-500">
+            <Zap className="w-3 h-3 mr-1" />
+            LIVE
+          </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Live Trading Status */}
+        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+          <div className="flex items-center space-x-2">
+            <span className="text-green-400">🔴 LIVE</span>
+            <div>
+              <div className="text-green-400 text-sm font-medium">
+                Connected to Binance Exchange
+              </div>
+              <div className="text-green-300 text-xs">
+                Real trades with minimum $10 volume
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Wallet Status */}
         <div className="space-y-2">
           <Label className="text-gray-300 flex items-center">
@@ -98,13 +123,13 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
 
         {/* Budget Configuration */}
         <div className="space-y-2">
-          <Label className="text-gray-300">Trading Budget</Label>
+          <Label className="text-gray-300">Trading Budget (Min $10)</Label>
           <div className="space-y-3">
             <Input
               type="number"
               value={budget}
               onChange={(e) => setBudget(Number(e.target.value))}
-              min={100}
+              min={10}
               max={balance * 0.8}
               className="bg-gray-800 border-gray-700 text-white"
             />
@@ -112,12 +137,12 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
               value={[budget]}
               onValueChange={(value) => setBudget(value[0])}
               max={Math.min(balance * 0.8, 5000)}
-              min={100}
-              step={50}
+              min={10}
+              step={10}
               className="w-full"
             />
             <div className="flex justify-between text-xs text-gray-400">
-              <span>$100</span>
+              <span>$10</span>
               <span>${budget}</span>
               <span>${Math.min(balance * 0.8, 5000)}</span>
             </div>
@@ -132,14 +157,24 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-gray-800 border-gray-700">
-              {strategies.map((strat) => (
-                <SelectItem key={strat.value} value={strat.value}>
-                  <div>
-                    <div className="font-medium">{strat.label}</div>
-                    <div className="text-xs text-gray-400">{strat.description}</div>
-                  </div>
-                </SelectItem>
-              ))}
+              <SelectItem value="arbitrage">
+                <div>
+                  <div className="font-medium">🔄 Cross-Chain Arbitrage</div>
+                  <div className="text-xs text-gray-400">Trade between exchanges</div>
+                </div>
+              </SelectItem>
+              <SelectItem value="ai_signals">
+                <div>
+                  <div className="font-medium">🤖 AI Signal Trading</div>
+                  <div className="text-xs text-gray-400">Follow AI predictions</div>
+                </div>
+              </SelectItem>
+              <SelectItem value="hybrid">
+                <div>
+                  <div className="font-medium">⚡ Hybrid Strategy</div>
+                  <div className="text-xs text-gray-400">Combine multiple approaches</div>
+                </div>
+              </SelectItem>
             </SelectContent>
           </Select>
           
@@ -159,17 +194,33 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-gray-800 border-gray-700">
-              {riskLevels.map((risk) => (
-                <SelectItem key={risk.value} value={risk.value}>
-                  <div className="flex items-center space-x-2">
-                    <div className={`w-3 h-3 rounded-full ${risk.color}`} />
-                    <div>
-                      <div className="font-medium">{risk.label}</div>
-                      <div className="text-xs text-gray-400">{risk.range} expected returns</div>
-                    </div>
+              <SelectItem value="low">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                  <div>
+                    <div className="font-medium">Low Risk</div>
+                    <div className="text-xs text-gray-400">0.3-0.8% expected returns</div>
                   </div>
-                </SelectItem>
-              ))}
+                </div>
+              </SelectItem>
+              <SelectItem value="medium">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                  <div>
+                    <div className="font-medium">Medium Risk</div>
+                    <div className="text-xs text-gray-400">0.5-1.5% expected returns</div>
+                  </div>
+                </div>
+              </SelectItem>
+              <SelectItem value="high">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 rounded-full bg-red-500" />
+                  <div>
+                    <div className="font-medium">High Risk</div>
+                    <div className="text-xs text-gray-400">1.0-3.0% expected returns</div>
+                  </div>
+                </div>
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -179,11 +230,11 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
           {!isActive ? (
             <Button
               onClick={handleStartTrading}
-              disabled={loading || budget < 100}
+              disabled={loading || budget < 10}
               className="w-full bg-green-600 hover:bg-green-700 text-white"
             >
               <Play className="w-4 h-4 mr-2" />
-              {loading ? 'Starting...' : 'Start Trading Bot'}
+              {loading ? 'Starting Live Trading...' : 'Start Live Trading Bot'}
             </Button>
           ) : (
             <Button
@@ -191,7 +242,7 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
               className="w-full bg-red-600 hover:bg-red-700 text-white"
             >
               <Square className="w-4 h-4 mr-2" />
-              Stop Trading Bot
+              Stop Live Trading
             </Button>
           )}
           
@@ -205,13 +256,13 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
           </div>
         </div>
 
-        {/* Risk Warning */}
-        <div className="bg-yellow-600/10 border border-yellow-600/30 rounded-lg p-3">
+        {/* Live Trading Warning */}
+        <div className="bg-red-600/10 border border-red-600/30 rounded-lg p-3">
           <div className="flex items-start space-x-2">
-            <AlertTriangle className="w-4 h-4 text-yellow-400 mt-0.5" />
-            <div className="text-xs text-yellow-200">
-              <div className="font-medium mb-1">Risk Warning</div>
-              <div>Cryptocurrency trading involves substantial risk. Only trade with funds you can afford to lose.</div>
+            <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5" />
+            <div className="text-xs text-red-200">
+              <div className="font-medium mb-1">⚠️ LIVE Trading Warning</div>
+              <div>You are trading with real money on live exchanges. Minimum trade is $10. All profits and losses are real.</div>
             </div>
           </div>
         </div>

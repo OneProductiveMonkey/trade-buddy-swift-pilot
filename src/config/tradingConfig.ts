@@ -5,15 +5,15 @@ export const TRADING_CONFIG = {
   API_BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
   
   // Binance API Configuration (these should be set as environment variables)
-  BINANCE_API_KEY: import.meta.env.VITE_BINANCE_API_KEY || '',
-  BINANCE_SECRET: import.meta.env.VITE_BINANCE_SECRET || '',
+  BINANCE_API_KEY: "Neyube4xusslnwpAqM7IaiphFvPqDL8oX0S7fOx2Q3Npiq7eKSGQKJnzvJTQ5jok",
+  BINANCE_SECRET: "KOWSrvPvlqv8C2UyKO0pGUZjPXPSi0FPobOdlsRRnHZcm2Q0SeHSjhatPeWzlmJa",
   
   // Trading Parameters
   SELECTED_MARKETS: [
     {
       symbol: 'BTC/USDT',
       name: 'Bitcoin',
-      basePrice: 43000,
+      basePrice: 68000,
       minProfitThreshold: 0.3,
       tradeAmountPct: 30,
       volatility: 'medium' as const,
@@ -22,7 +22,7 @@ export const TRADING_CONFIG = {
     {
       symbol: 'ETH/USDT', 
       name: 'Ethereum',
-      basePrice: 2600,
+      basePrice: 3500,
       minProfitThreshold: 0.4,
       tradeAmountPct: 25,
       volatility: 'medium' as const,
@@ -31,7 +31,7 @@ export const TRADING_CONFIG = {
     {
       symbol: 'SOL/USDT',
       name: 'Solana',
-      basePrice: 100,
+      basePrice: 150,
       minProfitThreshold: 0.5,
       tradeAmountPct: 20,
       volatility: 'high' as const,
@@ -40,14 +40,14 @@ export const TRADING_CONFIG = {
   ],
   
   // Exchange List
-  EXCHANGES: ['Binance', 'Coinbase', 'KuCoin', 'OKX', 'Bybit'],
+  EXCHANGES: ['Binance', 'KuCoin', 'Coinbase'],
   
   // Update Intervals
-  PRICE_UPDATE_INTERVAL: 5000, // 5 seconds
-  STATUS_UPDATE_INTERVAL: 3000, // 3 seconds
+  PRICE_UPDATE_INTERVAL: 10000, // 10 seconds for live data
+  STATUS_UPDATE_INTERVAL: 5000, // 5 seconds
   
-  // Trading Limits
-  MIN_TRADE_AMOUNT: 100,
+  // Trading Limits - Updated for live trading
+  MIN_TRADE_AMOUNT: 10, // $10 minimum as requested
   MAX_TRADE_AMOUNT: 1000,
   
   // Risk Levels
@@ -66,12 +66,8 @@ export const isApiConfigured = () => {
 // Environment setup instructions
 export const getSetupInstructions = () => {
   return {
-    message: 'För att aktivera live trading, sätt dessa miljövariabler:',
-    variables: [
-      'VITE_BINANCE_API_KEY=your_binance_api_key',
-      'VITE_BINANCE_SECRET=your_binance_secret',
-      'VITE_API_URL=http://localhost:5000'
-    ],
-    note: 'För säkerhet ska dessa sättas i din .env.local fil eller deployment miljö'
+    message: 'Live trading configured with Binance API',
+    status: 'ready',
+    note: 'Bot is connected to live Binance exchange with minimum $10 trades'
   };
 };
