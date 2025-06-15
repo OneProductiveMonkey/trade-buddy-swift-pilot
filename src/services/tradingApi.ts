@@ -1,9 +1,44 @@
-
 class TradingApiService {
   private baseUrl: string;
+  private ws: WebSocket | null = null;
 
   constructor() {
     this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  }
+
+  // WebSocket connection for real-time updates
+  connectWebSocket(onMessage: (data: any) => void) {
+    try {
+      this.ws = new WebSocket(`ws://localhost:5000/ws`);
+      
+      this.ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        onMessage(data);
+      };
+      
+      this.ws.onopen = () => {
+        console.log('WebSocket connected');
+      };
+      
+      this.ws.onclose = () => {
+        console.log('WebSocket disconnected');
+        // Attempt to reconnect after 3 seconds
+        setTimeout(() => this.connectWebSocket(onMessage), 3000);
+      };
+      
+      this.ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+    } catch (error) {
+      console.error('Failed to connect WebSocket:', error);
+    }
+  }
+
+  disconnectWebSocket() {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
   }
 
   async getEnhancedStatus() {
@@ -15,6 +50,19 @@ class TradingApiService {
       return await response.json();
     } catch (error) {
       console.error('API Error:', error);
+      throw error;
+    }
+  }
+
+  async getMarketAnalysis(symbol: string) {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/market_analysis/${symbol}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Market Analysis API Error:', error);
       throw error;
     }
   }
@@ -79,6 +127,34 @@ class TradingApiService {
       return await response.json();
     } catch (error) {
       console.error('Execute trade error:', error);
+      throw error;
+    }
+  }
+
+  async executeArbitrage(arbitrageData: any) {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/execute_arbitrage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(arbitrageData)
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Execute arbitrage error:', error);
+      throw error;
+    }
+  }
+
+  async sendNotification(notification: { type: string; message: string; priority?: string }) {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/notifications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(notification)
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Notification error:', error);
       throw error;
     }
   }

@@ -3,28 +3,34 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Progress } from '@/components/ui/progress';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { TrendingUp, TrendingDown, Activity, Bot, DollarSign, Target, Zap, Settings } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { Bot, Play, Square, TrendingUp, DollarSign, Target, Zap } from 'lucide-react';
+import { MarketAnalysisPanel } from './MarketAnalysisPanel';
+import { ArbitrageOpportunities } from './ArbitrageOpportunities';
+import { RealTimeTradeLog } from './RealTimeTradeLog';
 
-interface Trade {
-  id: string;
-  timestamp: string;
+interface Portfolio {
+  balance: number;
+  profit_live: number;
+  profit_24h: number;
+  total_trades: number;
+  successful_trades: number;
+  win_rate: number;
+}
+
+interface AISignal {
+  coin: string;
   symbol: string;
-  side: 'buy' | 'sell';
-  amount: number;
-  price: number;
-  profit: number;
-  strategy: string;
+  direction: string;
+  confidence: number;
+  current_price: number;
+  target_price: number;
+  risk_level: string;
+  timeframe: string;
 }
 
 interface EnhancedTradingBotProps {
-  onTrade: (trade: any) => void;
+  onTrade?: (order: any) => void;
   balance: number;
   isActive: boolean;
   onToggleActive: () => void;
@@ -36,305 +42,299 @@ export const EnhancedTradingBot: React.FC<EnhancedTradingBotProps> = ({
   isActive,
   onToggleActive
 }) => {
-  const [portfolio, setPortfolio] = useState({
+  const [portfolio, setPortfolio] = useState<Portfolio>({
     balance: balance,
     profit_live: 0,
     profit_24h: 0,
     total_trades: 0,
+    successful_trades: 0,
     win_rate: 0
   });
-
-  const [aiSignals, setAiSignals] = useState([
-    {
-      coin: 'Bitcoin',
-      symbol: 'BTC/USDT',
-      direction: 'buy',
-      confidence: 85.2,
-      current_price: 43250,
-      target_price: 44500,
-      risk_level: 'Medium risk'
-    },
-    {
-      coin: 'Ethereum',
-      symbol: 'ETH/USDT',
-      direction: 'buy',
-      confidence: 78.9,
-      current_price: 2650,
-      target_price: 2750,
-      risk_level: 'Low risk'
-    }
-  ]);
-
-  const [tradeHistory, setTradeHistory] = useState<Trade[]>([]);
+  
+  const [aiSignals, setAiSignals] = useState<AISignal[]>([]);
   const [tradingConfig, setTradingConfig] = useState({
-    budget: 500,
-    strategy: 'hybrid',
+    budget: 200,
+    strategy: 'arbitrage',
     riskLevel: 'medium'
   });
-
-  const { toast } = useToast();
+  const [connectionStatus, setConnectionStatus] = useState('Connecting...');
 
   useEffect(() => {
-    setPortfolio(prev => ({ ...prev, balance }));
-  }, [balance]);
+    updateData();
+    const interval = setInterval(updateData, 5000); // Update every 5 seconds
+    return () => clearInterval(interval);
+  }, []);
 
-  const handleExecuteSignal = (signal: any) => {
-    const trade = {
-      symbol: signal.symbol,
-      side: signal.direction,
-      amount: tradingConfig.budget / signal.current_price,
-      price: signal.current_price,
-      type: signal.direction
-    };
+  const updateData = async () => {
+    try {
+      const response = await fetch('/api/enhanced_status');
+      const data = await response.json();
+      
+      setPortfolio(data.portfolio);
+      setAiSignals(data.ai_signals || []);
+      
+      // Update connection status
+      const healthResponse = await fetch('/api/health');
+      const healthData = await healthResponse.json();
+      setConnectionStatus(
+        `Connected to ${healthData.active_exchanges} exchanges • ${healthData.monitored_markets} markets`
+      );
+    } catch (error) {
+      console.error('Failed to update data:', error);
+      setConnectionStatus('Connection Issues');
+    }
+  };
 
-    onTrade(trade);
+  const handleStartTrading = async () => {
+    try {
+      const response = await fetch('/api/start_enhanced_trading', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tradingConfig)
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        onToggleActive();
+      }
+    } catch (error) {
+      console.error('Failed to start trading:', error);
+    }
+  };
 
-    const newTrade: Trade = {
-      id: Date.now().toString(),
-      timestamp: new Date().toLocaleTimeString(),
-      symbol: signal.symbol,
-      side: signal.direction,
-      amount: trade.amount,
-      price: signal.current_price,
-      profit: Math.random() * 50 - 10, // Simulated profit
-      strategy: 'AI Signal'
-    };
+  const handleStopTrading = async () => {
+    try {
+      await fetch('/api/stop_enhanced_trading', { method: 'POST' });
+      onToggleActive();
+    } catch (error) {
+      console.error('Failed to stop trading:', error);
+    }
+  };
 
-    setTradeHistory(prev => [newTrade, ...prev.slice(0, 9)]);
-    setPortfolio(prev => ({
-      ...prev,
-      total_trades: prev.total_trades + 1,
-      profit_live: prev.profit_live + newTrade.profit,
-      win_rate: ((prev.total_trades * prev.win_rate + (newTrade.profit > 0 ? 100 : 0)) / (prev.total_trades + 1))
-    }));
-
-    toast({
-      title: "Trade Executed",
-      description: `${signal.direction.toUpperCase()} ${signal.coin} at $${signal.current_price}`,
-    });
+  const executeSignal = async (signal: AISignal) => {
+    try {
+      const response = await fetch('/api/execute_enhanced_trade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: signal.symbol,
+          side: signal.direction,
+          amount_usd: tradingConfig.budget,
+          strategy: 'ai_signal',
+          confidence: signal.confidence
+        })
+      });
+      
+      const result = await response.json();
+      if (onTrade) {
+        onTrade({
+          type: signal.direction,
+          symbol: signal.symbol,
+          amount: tradingConfig.budget / signal.current_price,
+          price: signal.current_price
+        });
+      }
+    } catch (error) {
+      console.error('Failed to execute signal:', error);
+    }
   };
 
   return (
     <div className="space-y-6">
-      {/* Portfolio Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Portfolio Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="bg-gray-900 border-gray-800">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Balance</p>
-                <p className="text-white text-xl font-bold">${portfolio.balance.toFixed(2)}</p>
-              </div>
-              <DollarSign className="w-8 h-8 text-green-400" />
+          <CardContent className="p-4 text-center">
+            <DollarSign className="w-8 h-8 mx-auto mb-2 text-green-400" />
+            <div className="text-2xl font-bold text-white">
+              ${portfolio.balance.toFixed(2)}
             </div>
+            <div className="text-sm text-gray-400">Portfolio Balance</div>
           </CardContent>
         </Card>
-
+        
         <Card className="bg-gray-900 border-gray-800">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Live P&L</p>
-                <p className={`text-xl font-bold ${portfolio.profit_live >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  ${portfolio.profit_live.toFixed(2)}
-                </p>
-              </div>
-              <TrendingUp className="w-8 h-8 text-green-400" />
+          <CardContent className="p-4 text-center">
+            <TrendingUp className="w-8 h-8 mx-auto mb-2 text-blue-400" />
+            <div className={`text-2xl font-bold ${portfolio.profit_live >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {portfolio.profit_live >= 0 ? '+' : ''}${portfolio.profit_live.toFixed(2)}
             </div>
+            <div className="text-sm text-gray-400">Live Profit</div>
           </CardContent>
         </Card>
-
+        
         <Card className="bg-gray-900 border-gray-800">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Win Rate</p>
-                <p className="text-white text-xl font-bold">{portfolio.win_rate.toFixed(1)}%</p>
-              </div>
-              <Target className="w-8 h-8 text-blue-400" />
+          <CardContent className="p-4 text-center">
+            <Target className="w-8 h-8 mx-auto mb-2 text-purple-400" />
+            <div className="text-2xl font-bold text-white">
+              {portfolio.win_rate.toFixed(1)}%
             </div>
+            <div className="text-sm text-gray-400">Win Rate</div>
           </CardContent>
         </Card>
-
+        
         <Card className="bg-gray-900 border-gray-800">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Total Trades</p>
-                <p className="text-white text-xl font-bold">{portfolio.total_trades}</p>
-              </div>
-              <Activity className="w-8 h-8 text-purple-400" />
+          <CardContent className="p-4 text-center">
+            <Zap className="w-8 h-8 mx-auto mb-2 text-yellow-400" />
+            <div className="text-2xl font-bold text-white">
+              {portfolio.total_trades}
             </div>
+            <div className="text-sm text-gray-400">Total Trades</div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Trading Interface */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Trading Controls */}
-        <Card className="lg:col-span-1 bg-gray-900 border-gray-800">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center">
-              <Settings className="w-5 h-5 mr-2" />
-              Trading Controls
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-gray-400">Auto Trading</span>
-              <Switch checked={isActive} onCheckedChange={onToggleActive} />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-gray-400 text-sm">Budget ($)</label>
-              <Input
+      {/* Trading Controls */}
+      <Card className="bg-gray-900 border-gray-800">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center">
+            <Bot className="w-5 h-5 mr-2 text-green-400" />
+            Trading Controls
+            <Badge 
+              variant={isActive ? "default" : "secondary"}
+              className="ml-2"
+            >
+              {isActive ? "Active" : "Inactive"}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Trading Budget
+              </label>
+              <input
                 type="number"
                 value={tradingConfig.budget}
-                onChange={(e) => setTradingConfig(prev => ({ ...prev, budget: Number(e.target.value) }))}
-                className="bg-gray-800 border-gray-700 text-white"
+                onChange={(e) => setTradingConfig({...tradingConfig, budget: Number(e.target.value)})}
+                className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white"
+                min="100"
+                max="1000"
+                step="50"
               />
             </div>
-
-            <div className="space-y-2">
-              <label className="text-gray-400 text-sm">Strategy</label>
-              <Select value={tradingConfig.strategy} onValueChange={(value) => setTradingConfig(prev => ({ ...prev, strategy: value }))}>
-                <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-gray-800 border-gray-700">
-                  <SelectItem value="arbitrage">Arbitrage</SelectItem>
-                  <SelectItem value="ai_signals">AI Signals</SelectItem>
-                  <SelectItem value="hybrid">Hybrid</SelectItem>
-                </SelectContent>
-              </Select>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Strategy
+              </label>
+              <select
+                value={tradingConfig.strategy}
+                onChange={(e) => setTradingConfig({...tradingConfig, strategy: e.target.value})}
+                className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white"
+              >
+                <option value="arbitrage">Multi-Exchange Arbitrage</option>
+                <option value="ai_signals">AI Signal Trading</option>
+                <option value="hybrid">Hybrid Strategy</option>
+              </select>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-gray-400 text-sm">Risk Level</label>
-              <Select value={tradingConfig.riskLevel} onValueChange={(value) => setTradingConfig(prev => ({ ...prev, riskLevel: value }))}>
-                <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-gray-800 border-gray-700">
-                  <SelectItem value="low">Low Risk</SelectItem>
-                  <SelectItem value="medium">Medium Risk</SelectItem>
-                  <SelectItem value="high">High Risk</SelectItem>
-                </SelectContent>
-              </Select>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Risk Level
+              </label>
+              <select
+                value={tradingConfig.riskLevel}
+                onChange={(e) => setTradingConfig({...tradingConfig, riskLevel: e.target.value})}
+                className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white"
+              >
+                <option value="low">Low Risk</option>
+                <option value="medium">Medium Risk</option>
+                <option value="high">High Risk</option>
+              </select>
             </div>
+          </div>
+          
+          <div className="flex space-x-4">
+            <Button
+              onClick={isActive ? handleStopTrading : handleStartTrading}
+              className={isActive ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}
+            >
+              {isActive ? (
+                <>
+                  <Square className="w-4 h-4 mr-2" />
+                  Stop Trading
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4 mr-2" />
+                  Start Trading
+                </>
+              )}
+            </Button>
+          </div>
+          
+          <div className="mt-4 text-sm text-gray-400">
+            Status: {connectionStatus}
+          </div>
+        </CardContent>
+      </Card>
 
-            {isActive && (
-              <div className="p-3 bg-green-900/20 border border-green-700 rounded">
-                <div className="flex items-center text-green-400">
-                  <Bot className="w-4 h-4 mr-2 animate-pulse" />
-                  <span className="text-sm">Bot Active - Scanning Markets</span>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* AI Signals & Trade History */}
-        <Card className="lg:col-span-2 bg-gray-900 border-gray-800">
-          <CardHeader>
-            <CardTitle className="text-white">Trading Dashboard</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="signals" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 bg-gray-800">
-                <TabsTrigger value="signals" className="text-gray-300">AI Signals</TabsTrigger>
-                <TabsTrigger value="history" className="text-gray-300">Trade History</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="signals" className="space-y-4">
-                {aiSignals.map((signal, index) => (
-                  <div key={index} className="p-4 bg-gray-800 rounded-lg border border-gray-700">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-yellow-600 rounded-full flex items-center justify-center">
-                          <span className="text-white text-sm font-bold">₿</span>
-                        </div>
-                        <div>
-                          <h3 className="text-white font-semibold">{signal.coin}</h3>
-                          <p className="text-gray-400 text-sm">{signal.symbol}</p>
-                        </div>
-                      </div>
-                      <Badge 
-                        variant={signal.direction === 'buy' ? 'default' : 'destructive'}
-                        className={signal.direction === 'buy' ? 'bg-green-600' : 'bg-red-600'}
-                      >
+      {/* AI Signals */}
+      <Card className="bg-gray-900 border-gray-800">
+        <CardHeader>
+          <CardTitle className="text-white">🤖 AI Trading Signals</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {aiSignals.length === 0 ? (
+            <div className="text-center py-4 text-gray-400">
+              No signals available. Analyzing market conditions...
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              {aiSignals.map((signal, index) => (
+                <div key={index} className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-white">{signal.coin}</span>
+                      <Badge variant={signal.direction === 'buy' ? 'default' : 'destructive'}>
                         {signal.direction.toUpperCase()}
                       </Badge>
+                      <Badge variant="outline">
+                        {signal.confidence.toFixed(1)}% confidence
+                      </Badge>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-4 mb-3">
-                      <div>
-                        <p className="text-gray-400 text-xs">Current Price</p>
-                        <p className="text-white font-semibold">${signal.current_price.toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-400 text-xs">Target Price</p>
-                        <p className="text-white font-semibold">${signal.target_price.toLocaleString()}</p>
-                      </div>
-                    </div>
-
-                    <div className="mb-3">
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-gray-400">Confidence</span>
-                        <span className="text-white">{signal.confidence}%</span>
-                      </div>
-                      <Progress value={signal.confidence} className="h-2" />
-                    </div>
-
-                    <Button 
-                      onClick={() => handleExecuteSignal(signal)}
-                      className="w-full bg-blue-600 hover:bg-blue-700"
-                      disabled={!isActive}
+                    <Button
+                      onClick={() => executeSignal(signal)}
+                      size="sm"
+                      className={signal.direction === 'buy' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
                     >
-                      <Zap className="w-4 h-4 mr-2" />
-                      Execute Trade
+                      Execute
                     </Button>
                   </div>
-                ))}
-              </TabsContent>
-
-              <TabsContent value="history">
-                <ScrollArea className="h-96">
-                  <div className="space-y-2">
-                    {tradeHistory.length > 0 ? tradeHistory.map((trade) => (
-                      <div key={trade.id} className="p-3 bg-gray-800 rounded border border-gray-700">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <Badge variant={trade.side === 'buy' ? 'default' : 'destructive'}>
-                              {trade.side.toUpperCase()}
-                            </Badge>
-                            <div>
-                              <p className="text-white text-sm font-semibold">{trade.symbol}</p>
-                              <p className="text-gray-400 text-xs">{trade.timestamp}</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-white text-sm">${trade.price.toFixed(2)}</p>
-                            <p className={`text-xs ${trade.profit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {trade.profit >= 0 ? '+' : ''}${trade.profit.toFixed(2)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )) : (
-                      <div className="text-center text-gray-400 py-8">
-                        <Activity className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                        <p>No trades executed yet</p>
-                        <p className="text-sm">Start trading to see history</p>
-                      </div>
-                    )}
+                  <div className="text-sm text-gray-400">
+                    Current: ${signal.current_price.toFixed(4)} → Target: ${signal.target_price.toFixed(4)}
+                    <br />
+                    {signal.risk_level} • {signal.timeframe}
                   </div>
-                </ScrollArea>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-      </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Advanced Features Tabs */}
+      <Tabs defaultValue="market-analysis" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 bg-gray-800">
+          <TabsTrigger value="market-analysis">Market Analysis</TabsTrigger>
+          <TabsTrigger value="arbitrage">Arbitrage</TabsTrigger>
+          <TabsTrigger value="trade-log">Trade Log</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="market-analysis">
+          <MarketAnalysisPanel />
+        </TabsContent>
+        
+        <TabsContent value="arbitrage">
+          <ArbitrageOpportunities onExecute={(opp) => console.log('Arbitrage executed:', opp)} />
+        </TabsContent>
+        
+        <TabsContent value="trade-log">
+          <RealTimeTradeLog />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
