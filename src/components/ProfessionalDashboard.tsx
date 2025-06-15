@@ -7,6 +7,7 @@ import { TradingControls } from './TradingControls';
 import { MarketAnalysisPanel } from './MarketAnalysisPanel';
 import { ArbitrageOpportunities } from './ArbitrageOpportunities';
 import { RealTimeTradeLog } from './RealTimeTradeLog';
+import { WalletConnection } from './WalletConnection';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import { tradingApi } from '@/services/tradingApi';
@@ -103,7 +104,6 @@ export const ProfessionalDashboard: React.FC<ProfessionalDashboardProps> = ({
     if (isActive) {
       handleStopTrading();
     } else {
-      // Will be handled by TradingControls
       setShowSettings(true);
     }
   };
@@ -121,6 +121,9 @@ export const ProfessionalDashboard: React.FC<ProfessionalDashboardProps> = ({
 
         {/* Stats Grid */}
         <StatsGrid portfolio={portfolio} />
+
+        {/* Wallet Connection Section */}
+        <WalletConnection />
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

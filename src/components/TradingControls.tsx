@@ -2,13 +2,13 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
-import { Settings, Bot, Zap, Shield, TrendingUp } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Settings, Play, Square, Wallet, AlertTriangle } from 'lucide-react';
+import { walletService } from '@/services/walletService';
 
 interface TradingControlsProps {
   onStartTrading: (config: any) => void;
@@ -23,184 +23,197 @@ export const TradingControls: React.FC<TradingControlsProps> = ({
   isActive,
   balance
 }) => {
-  const [config, setConfig] = useState({
-    budget: 200,
-    strategy: 'arbitrage',
-    riskLevel: 'medium',
-    autoRebalance: true,
-    stopLoss: 5,
-    takeProfit: 10,
-    maxPositions: 3
-  });
+  const [budget, setBudget] = useState(500);
+  const [strategy, setStrategy] = useState('arbitrage');
+  const [riskLevel, setRiskLevel] = useState('medium');
+  const [loading, setLoading] = useState(false);
+
+  const handleStartTrading = async () => {
+    // Check if wallets are connected for arbitrage
+    if (strategy === 'arbitrage') {
+      const phantomAvailable = walletService.isPhantomAvailable();
+      const metamaskAvailable = walletService.isMetaMaskAvailable();
+      
+      if (!phantomAvailable && !metamaskAvailable) {
+        alert('⚠️ Please connect at least one wallet for arbitrage trading');
+        return;
+      }
+    }
+
+    setLoading(true);
+    try {
+      await onStartTrading({
+        budget,
+        strategy,
+        risk_level: riskLevel
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const strategies = [
-    { value: 'arbitrage', label: 'Arbitrage', icon: '⚡', desc: 'Multi-exchange price differences' },
-    { value: 'ai_signals', label: 'AI Signals', icon: '🤖', desc: 'Machine learning predictions' },
-    { value: 'grid', label: 'Grid Trading', icon: '📊', desc: 'Automated buy/sell grid' },
-    { value: 'dca', label: 'DCA Bot', icon: '💰', desc: 'Dollar cost averaging' }
+    { value: 'arbitrage', label: '🔄 Cross-Chain Arbitrage', description: 'Trade between exchanges' },
+    { value: 'ai_signals', label: '🤖 AI Signal Trading', description: 'Follow AI predictions' },
+    { value: 'hybrid', label: '⚡ Hybrid Strategy', description: 'Combine multiple approaches' },
+    { value: 'conservative', label: '🛡️ Conservative Mode', description: 'Low risk, steady gains' }
   ];
 
   const riskLevels = [
-    { value: 'conservative', label: 'Conservative', color: 'bg-green-500', range: '0.1-0.5%' },
-    { value: 'moderate', label: 'Moderate', color: 'bg-yellow-500', range: '0.5-1.5%' },
-    { value: 'aggressive', label: 'Aggressive', color: 'bg-red-500', range: '1.5-3.0%' }
+    { value: 'low', label: 'Low Risk', color: 'bg-green-500', range: '0.3-0.8%' },
+    { value: 'medium', label: 'Medium Risk', color: 'bg-yellow-500', range: '0.5-1.5%' },
+    { value: 'high', label: 'High Risk', color: 'bg-red-500', range: '1.0-3.0%' }
   ];
-
-  const handleStart = () => {
-    onStartTrading(config);
-  };
 
   return (
     <Card className="bg-gray-900 border-gray-800">
-      <CardHeader className="pb-3">
+      <CardHeader>
         <CardTitle className="text-white flex items-center">
           <Settings className="w-5 h-5 mr-2 text-blue-400" />
           Trading Configuration
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Wallet Status */}
+        <div className="space-y-2">
+          <Label className="text-gray-300 flex items-center">
+            <Wallet className="w-4 h-4 mr-2" />
+            Wallet Status
+          </Label>
+          <div className="flex space-x-2">
+            <Badge 
+              variant={walletService.isPhantomAvailable() ? "default" : "secondary"}
+              className={walletService.isPhantomAvailable() ? "bg-purple-600" : "bg-gray-600"}
+            >
+              👻 Phantom {walletService.isPhantomAvailable() ? "Ready" : "Not Connected"}
+            </Badge>
+            <Badge 
+              variant={walletService.isMetaMaskAvailable() ? "default" : "secondary"}
+              className={walletService.isMetaMaskAvailable() ? "bg-orange-600" : "bg-gray-600"}
+            >
+              🦊 MetaMask {walletService.isMetaMaskAvailable() ? "Ready" : "Not Connected"}
+            </Badge>
+          </div>
+        </div>
+
         {/* Budget Configuration */}
-        <div className="space-y-3">
-          <Label className="text-sm font-medium text-gray-300">Trading Budget</Label>
-          <div className="space-y-2">
+        <div className="space-y-2">
+          <Label className="text-gray-300">Trading Budget</Label>
+          <div className="space-y-3">
             <Input
               type="number"
-              value={config.budget}
-              onChange={(e) => setConfig({...config, budget: Number(e.target.value)})}
+              value={budget}
+              onChange={(e) => setBudget(Number(e.target.value))}
+              min={100}
+              max={balance * 0.8}
               className="bg-gray-800 border-gray-700 text-white"
-              min="100"
-              max={balance}
             />
             <Slider
-              value={[config.budget]}
-              onValueChange={(value) => setConfig({...config, budget: value[0]})}
-              max={balance}
+              value={[budget]}
+              onValueChange={(value) => setBudget(value[0])}
+              max={Math.min(balance * 0.8, 5000)}
               min={100}
               step={50}
               className="w-full"
             />
             <div className="flex justify-between text-xs text-gray-400">
               <span>$100</span>
-              <span>${balance.toLocaleString()}</span>
+              <span>${budget}</span>
+              <span>${Math.min(balance * 0.8, 5000)}</span>
             </div>
           </div>
         </div>
 
         {/* Strategy Selection */}
-        <div className="space-y-3">
-          <Label className="text-sm font-medium text-gray-300">Trading Strategy</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {strategies.map((strategy) => (
-              <div
-                key={strategy.value}
-                onClick={() => setConfig({...config, strategy: strategy.value})}
-                className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                  config.strategy === strategy.value
-                    ? 'border-blue-500 bg-blue-500/10'
-                    : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
-                }`}
-              >
-                <div className="flex items-center space-x-2 mb-1">
-                  <span className="text-lg">{strategy.icon}</span>
-                  <span className="text-sm font-medium text-white">{strategy.label}</span>
-                </div>
-                <p className="text-xs text-gray-400">{strategy.desc}</p>
-              </div>
-            ))}
-          </div>
+        <div className="space-y-2">
+          <Label className="text-gray-300">Trading Strategy</Label>
+          <Select value={strategy} onValueChange={setStrategy}>
+            <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-gray-800 border-gray-700">
+              {strategies.map((strat) => (
+                <SelectItem key={strat.value} value={strat.value}>
+                  <div>
+                    <div className="font-medium">{strat.label}</div>
+                    <div className="text-xs text-gray-400">{strat.description}</div>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          {strategy === 'arbitrage' && (!walletService.isPhantomAvailable() && !walletService.isMetaMaskAvailable()) && (
+            <div className="flex items-center space-x-2 text-yellow-400 text-sm">
+              <AlertTriangle className="w-4 h-4" />
+              <span>Connect wallets above for cross-chain arbitrage</span>
+            </div>
+          )}
         </div>
 
         {/* Risk Level */}
-        <div className="space-y-3">
-          <Label className="text-sm font-medium text-gray-300">Risk Level</Label>
-          <div className="space-y-2">
-            {riskLevels.map((risk) => (
-              <div
-                key={risk.value}
-                onClick={() => setConfig({...config, riskLevel: risk.value})}
-                className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                  config.riskLevel === risk.value
-                    ? 'border-blue-500 bg-blue-500/10'
-                    : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-3 h-3 rounded-full ${risk.color}`}></div>
-                    <span className="text-sm font-medium text-white">{risk.label}</span>
+        <div className="space-y-2">
+          <Label className="text-gray-300">Risk Level</Label>
+          <Select value={riskLevel} onValueChange={setRiskLevel}>
+            <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-gray-800 border-gray-700">
+              {riskLevels.map((risk) => (
+                <SelectItem key={risk.value} value={risk.value}>
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-3 h-3 rounded-full ${risk.color}`} />
+                    <div>
+                      <div className="font-medium">{risk.label}</div>
+                      <div className="text-xs text-gray-400">{risk.range} expected returns</div>
+                    </div>
                   </div>
-                  <Badge variant="outline" className="text-xs">
-                    {risk.range}
-                  </Badge>
-                </div>
-              </div>
-            ))}
-          </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* Advanced Settings */}
-        <div className="space-y-4 pt-4 border-t border-gray-800">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-medium text-gray-300">Auto Rebalance</Label>
-            <Switch
-              checked={config.autoRebalance}
-              onCheckedChange={(checked) => setConfig({...config, autoRebalance: checked})}
-            />
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-xs text-gray-400">Stop Loss (%)</Label>
-              <Input
-                type="number"
-                value={config.stopLoss}
-                onChange={(e) => setConfig({...config, stopLoss: Number(e.target.value)})}
-                className="bg-gray-800 border-gray-700 text-white text-sm"
-                min="1"
-                max="20"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label className="text-xs text-gray-400">Take Profit (%)</Label>
-              <Input
-                type="number"
-                value={config.takeProfit}
-                onChange={(e) => setConfig({...config, takeProfit: Number(e.target.value)})}
-                className="bg-gray-800 border-gray-700 text-white text-sm"
-                min="1"
-                max="50"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex space-x-3 pt-4">
-          {isActive ? (
+        {/* Trading Controls */}
+        <div className="space-y-3">
+          {!isActive ? (
             <Button
-              onClick={onStopTrading}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+              onClick={handleStartTrading}
+              disabled={loading || budget < 100}
+              className="w-full bg-green-600 hover:bg-green-700 text-white"
             >
-              <Shield className="w-4 h-4 mr-2" />
-              Stop Trading
+              <Play className="w-4 h-4 mr-2" />
+              {loading ? 'Starting...' : 'Start Trading Bot'}
             </Button>
           ) : (
             <Button
-              onClick={handleStart}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={onStopTrading}
+              className="w-full bg-red-600 hover:bg-red-700 text-white"
             >
-              <Bot className="w-4 h-4 mr-2" />
-              Start Trading
+              <Square className="w-4 h-4 mr-2" />
+              Stop Trading Bot
             </Button>
           )}
           
-          <Button
-            variant="outline"
-            className="border-gray-700 text-gray-300 hover:bg-gray-800"
-          >
-            <TrendingUp className="w-4 h-4" />
-          </Button>
+          <div className="grid grid-cols-2 gap-2 text-xs text-gray-400">
+            <div>
+              <span className="font-medium">Available:</span> ${balance.toFixed(2)}
+            </div>
+            <div>
+              <span className="font-medium">Using:</span> ${budget}
+            </div>
+          </div>
+        </div>
+
+        {/* Risk Warning */}
+        <div className="bg-yellow-600/10 border border-yellow-600/30 rounded-lg p-3">
+          <div className="flex items-start space-x-2">
+            <AlertTriangle className="w-4 h-4 text-yellow-400 mt-0.5" />
+            <div className="text-xs text-yellow-200">
+              <div className="font-medium mb-1">Risk Warning</div>
+              <div>Cryptocurrency trading involves substantial risk. Only trade with funds you can afford to lose.</div>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
