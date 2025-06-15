@@ -36,7 +36,6 @@ class WalletService {
   private solanaConnection: Connection;
 
   constructor() {
-    // Use mainnet for live trading
     this.solanaConnection = new Connection('https://api.mainnet-beta.solana.com');
   }
 
@@ -44,40 +43,22 @@ class WalletService {
     return typeof window !== 'undefined';
   }
 
-  // Enhanced Phantom Wallet Integration
   async connectPhantom(): Promise<WalletInfo | null> {
     try {
       if (!this.isBrowser()) {
-        throw new Error('Phantom only available in browser');
+        throw new Error('Phantom endast tillgänglig i webbläsare');
       }
 
       if (!window.solana?.isPhantom) {
         window.open('https://phantom.app/', '_blank');
-        throw new Error('Phantom wallet not installed. Opening installation page.');
+        throw new Error('Phantom wallet ej installerad. Öppnar installationssida.');
       }
 
-      // Check if already connected
-      if (window.solana.isConnected && window.solana.publicKey) {
-        console.log('Phantom already connected, using existing connection');
-        const publicKey = window.solana.publicKey;
-        const balance = await this.getSolanaBalance(publicKey);
-        
-        return {
-          address: publicKey.toString(),
-          balance: balance,
-          network: 'solana-mainnet',
-          type: 'phantom',
-          isConnected: true
-        };
-      }
-
-      // Request new connection
       const response = await window.solana.connect();
       const publicKey = response.publicKey;
       
-      if (!publicKey) throw new Error('No public key from Phantom');
+      if (!publicKey) throw new Error('Ingen publik nyckel från Phantom');
 
-      // Get real balance from Solana mainnet
       const balance = await this.getSolanaBalance(publicKey);
 
       return {
@@ -88,43 +69,25 @@ class WalletService {
         isConnected: true
       };
     } catch (error: any) {
-      console.error('Phantom connection error:', error);
-      throw new Error(error.message || 'Phantom connection failed');
+      console.error('Phantom anslutningsfel:', error);
+      throw new Error(error.message || 'Phantom anslutning misslyckades');
     }
   }
 
-  // Enhanced MetaMask Integration
   async connectMetaMask(): Promise<WalletInfo | null> {
     try {
       if (!this.isBrowser()) {
-        throw new Error('MetaMask only available in browser');
+        throw new Error('MetaMask endast tillgänglig i webbläsare');
       }
 
       if (!window.ethereum?.isMetaMask) {
         window.open('https://metamask.io/download/', '_blank');
-        throw new Error('MetaMask not installed. Opening installation page.');
+        throw new Error('MetaMask ej installerad. Öppnar installationssida.');
       }
 
-      // Check if already connected
-      if (window.ethereum.selectedAddress && window.ethereum.isConnected()) {
-        console.log('MetaMask already connected, using existing connection');
-        const address = window.ethereum.selectedAddress;
-        const balance = await this.getEthereumBalance(address);
-        const network = await this.getEthereumNetwork();
-        
-        return {
-          address,
-          balance,
-          network,
-          type: 'metamask',
-          isConnected: true
-        };
-      }
-
-      // Request account access
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
       if (!accounts || accounts.length === 0) {
-        throw new Error('No accounts available in MetaMask');
+        throw new Error('Inga konton tillgängliga i MetaMask');
       }
 
       const address = accounts[0];
@@ -139,53 +102,47 @@ class WalletService {
         isConnected: true
       };
     } catch (error: any) {
-      console.error('MetaMask connection error:', error);
-      throw new Error(error.message || 'MetaMask connection failed');
+      console.error('MetaMask anslutningsfel:', error);
+      throw new Error(error.message || 'MetaMask anslutning misslyckades');
     }
   }
 
-  // Get real Solana balance
   private async getSolanaBalance(publicKey: PublicKey): Promise<number> {
     try {
       const balance = await this.solanaConnection.getBalance(publicKey);
-      return balance / 1e9; // Convert lamports to SOL
+      return balance / 1e9;
     } catch (error) {
-      console.error('Failed to get SOL balance:', error);
-      // Return 0 instead of simulated balance for accuracy
+      console.error('Misslyckades att hämta SOL saldo:', error);
       return 0;
     }
   }
 
-  // Get real Ethereum balance
   private async getEthereumBalance(address: string): Promise<number> {
     try {
-      if (!window.ethereum) throw new Error('No Ethereum provider');
+      if (!window.ethereum) throw new Error('Ingen Ethereum provider');
       
       const provider = new ethers.BrowserProvider(window.ethereum);
       const balance = await provider.getBalance(address);
       return parseFloat(ethers.formatEther(balance));
     } catch (error) {
-      console.error('Failed to get ETH balance:', error);
-      // Return 0 instead of simulated balance for accuracy
+      console.error('Misslyckades att hämta ETH saldo:', error);
       return 0;
     }
   }
 
-  // Get Ethereum network
   private async getEthereumNetwork(): Promise<string> {
     try {
-      if (!window.ethereum) return 'unknown';
+      if (!window.ethereum) return 'okänt';
       
       const provider = new ethers.BrowserProvider(window.ethereum);
       const network = await provider.getNetwork();
       return network.name || 'ethereum';
     } catch (error) {
-      console.error('Failed to get network:', error);
+      console.error('Misslyckades att hämta nätverk:', error);
       return 'ethereum';
     }
   }
 
-  // Check wallet status without connecting
   async getPhantomStatus(): Promise<{ connected: boolean; address?: string }> {
     if (!this.isBrowser() || !window.solana?.isPhantom) {
       return { connected: false };
@@ -221,13 +178,11 @@ class WalletService {
       if (type === 'phantom' && window.solana) {
         await window.solana.disconnect();
       }
-      // MetaMask doesn't have programmatic disconnect
     } catch (error) {
-      console.error('Disconnect error:', error);
+      console.error('Frånkopplingfel:', error);
     }
   }
 
-  // Check if wallets are available and properly installed
   isPhantomAvailable(): boolean {
     return this.isBrowser() && !!window.solana?.isPhantom;
   }
@@ -236,7 +191,6 @@ class WalletService {
     return this.isBrowser() && !!window.ethereum?.isMetaMask;
   }
 
-  // Get wallet connection status for display
   async getWalletReadyStatus(): Promise<{ phantom: boolean; metamask: boolean }> {
     const phantomStatus = await this.getPhantomStatus();
     const metamaskStatus = await this.getMetaMaskStatus();

@@ -46,9 +46,9 @@ export const TRADING_CONFIG = {
   PRICE_UPDATE_INTERVAL: 10000, // 10 seconds for live data
   STATUS_UPDATE_INTERVAL: 5000, // 5 seconds
   
-  // Trading Limits - Updated for live trading
-  MIN_TRADE_AMOUNT: 10, // $10 minimum as requested
-  MAX_TRADE_AMOUNT: 1000,
+  // Trading Limits - Updated for test trading
+  MIN_TRADE_AMOUNT: 5, // $5 minimum for testing
+  MAX_TRADE_AMOUNT: 500,
   
   // Risk Levels
   RISK_LEVELS: {
@@ -66,8 +66,8 @@ export const isApiConfigured = () => {
 // Environment setup instructions
 export const getSetupInstructions = () => {
   return {
-    message: 'Live trading configured with Binance API',
+    message: 'Testhandel konfigurerad med Binance API',
     status: 'ready',
-    note: 'Bot is connected to live Binance exchange with minimum $10 trades'
+    note: 'Bot är ansluten till testläge med minimum $5 trades'
   };
 };

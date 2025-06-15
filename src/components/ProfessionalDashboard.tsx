@@ -8,6 +8,7 @@ import { MarketAnalysisPanel } from './MarketAnalysisPanel';
 import { ArbitrageOpportunities } from './ArbitrageOpportunities';
 import { RealTimeTradeLog } from './RealTimeTradeLog';
 import { WalletConnection } from './WalletConnection';
+import { UserSettings } from './UserSettings';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import { tradingApi } from '@/services/tradingApi';
@@ -54,7 +55,7 @@ export const ProfessionalDashboard: React.FC<ProfessionalDashboardProps> = ({
       const data = await tradingApi.getEnhancedStatus();
       setPortfolio(data.portfolio);
     } catch (error) {
-      console.error('Failed to update data:', error);
+      console.error('Misslyckades att uppdatera data:', error);
     }
   };
 
@@ -64,20 +65,20 @@ export const ProfessionalDashboard: React.FC<ProfessionalDashboardProps> = ({
       if (result.success) {
         setIsActive(true);
         toast({
-          title: "Trading Started",
-          description: `Bot activated with $${config.budget} budget`,
+          title: "Trading Startad",
+          description: `Bot aktiverad med $${config.budget} budget`,
         });
       } else {
         toast({
-          title: "Failed to Start",
+          title: "Misslyckades att starta",
           description: result.message,
           variant: "destructive",
         });
       }
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to start trading bot",
+        title: "Fel",
+        description: "Misslyckades att starta trading bot",
         variant: "destructive",
       });
     }
@@ -88,13 +89,13 @@ export const ProfessionalDashboard: React.FC<ProfessionalDashboardProps> = ({
       await tradingApi.stopEnhancedTrading();
       setIsActive(false);
       toast({
-        title: "Trading Stopped",
-        description: "Bot has been deactivated",
+        title: "Trading Stoppad",
+        description: "Bot har inaktiverats",
       });
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to stop trading bot",
+        title: "Fel",
+        description: "Misslyckades att stoppa trading bot",
         variant: "destructive",
       });
     }
@@ -111,7 +112,6 @@ export const ProfessionalDashboard: React.FC<ProfessionalDashboardProps> = ({
   return (
     <div className="min-h-screen bg-black p-4">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
         <TradingHeader
           isActive={isActive}
           profit={portfolio.profit_live}
@@ -119,15 +119,11 @@ export const ProfessionalDashboard: React.FC<ProfessionalDashboardProps> = ({
           onSettings={() => setShowSettings(!showSettings)}
         />
 
-        {/* Stats Grid */}
         <StatsGrid portfolio={portfolio} />
 
-        {/* Wallet Connection Section */}
         <WalletConnection />
 
-        {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Trading Controls */}
           <div className="lg:col-span-1">
             <TradingControls
               onStartTrading={handleStartTrading}
@@ -137,15 +133,14 @@ export const ProfessionalDashboard: React.FC<ProfessionalDashboardProps> = ({
             />
           </div>
 
-          {/* Right Column - Analysis & Trading */}
           <div className="lg:col-span-2">
             <Tabs defaultValue="analysis" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 bg-gray-800 border-gray-700">
+              <TabsList className="grid w-full grid-cols-4 bg-gray-800 border-gray-700">
                 <TabsTrigger 
                   value="analysis" 
                   className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
                 >
-                  Market Analysis
+                  Analys
                 </TabsTrigger>
                 <TabsTrigger 
                   value="arbitrage"
@@ -157,7 +152,13 @@ export const ProfessionalDashboard: React.FC<ProfessionalDashboardProps> = ({
                   value="trades"
                   className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
                 >
-                  Trade Log
+                  Trades
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="settings"
+                  className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                >
+                  Inställningar
                 </TabsTrigger>
               </TabsList>
               
@@ -172,6 +173,10 @@ export const ProfessionalDashboard: React.FC<ProfessionalDashboardProps> = ({
                 
                 <TabsContent value="trades" className="mt-0">
                   <RealTimeTradeLog />
+                </TabsContent>
+                
+                <TabsContent value="settings" className="mt-0">
+                  <UserSettings />
                 </TabsContent>
               </div>
             </Tabs>
