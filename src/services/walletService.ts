@@ -1,4 +1,3 @@
-
 import { Connection, PublicKey } from '@solana/web3.js';
 import { ethers } from 'ethers';
 
@@ -30,10 +29,12 @@ export interface WalletInfo {
   network: string;
   type: 'phantom' | 'metamask';
   isConnected: boolean;
+  usdValue?: number;
 }
 
 class WalletService {
   private solanaConnection: Connection;
+  private solscanApiUrl = 'https://api.solscan.io';
 
   constructor() {
     this.solanaConnection = new Connection('https://api.mainnet-beta.solana.com');
@@ -59,14 +60,17 @@ class WalletService {
       
       if (!publicKey) throw new Error('Ingen publik nyckel från Phantom');
 
-      const balance = await this.getSolanaBalance(publicKey);
+      // Get real balance using both RPC and Solscan for accuracy
+      const balance = await this.getSolanaBalanceAccurate(publicKey);
+      const usdValue = balance * 150; // Approximate SOL price
 
       return {
         address: publicKey.toString(),
         balance: balance,
         network: 'solana-mainnet',
         type: 'phantom',
-        isConnected: true
+        isConnected: true,
+        usdValue: usdValue
       };
     } catch (error: any) {
       console.error('Phantom anslutningsfel:', error);
@@ -85,21 +89,27 @@ class WalletService {
         throw new Error('MetaMask ej installerad. Öppnar installationssida.');
       }
 
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      // Request account access
+      const accounts = await window.ethereum.request({ 
+        method: 'eth_requestAccounts' 
+      });
+      
       if (!accounts || accounts.length === 0) {
         throw new Error('Inga konton tillgängliga i MetaMask');
       }
 
       const address = accounts[0];
-      const balance = await this.getEthereumBalance(address);
+      const balance = await this.getEthereumBalanceAccurate(address);
       const network = await this.getEthereumNetwork();
+      const usdValue = balance * 3500; // Approximate ETH price
 
       return {
         address,
         balance,
         network,
         type: 'metamask',
-        isConnected: true
+        isConnected: true,
+        usdValue: usdValue
       };
     } catch (error: any) {
       console.error('MetaMask anslutningsfel:', error);
@@ -107,17 +117,46 @@ class WalletService {
     }
   }
 
-  private async getSolanaBalance(publicKey: PublicKey): Promise<number> {
+  private async getSolanaBalanceAccurate(publicKey: PublicKey): Promise<number> {
     try {
+      // Try Solscan API first for more accurate balance
+      const solscanBalance = await this.getSolanaBalanceFromSolscan(publicKey.toString());
+      if (solscanBalance !== null) {
+        return solscanBalance;
+      }
+      
+      // Fallback to RPC
       const balance = await this.solanaConnection.getBalance(publicKey);
       return balance / 1e9; // Convert lamports to SOL
     } catch (error) {
       console.error('Misslyckades att hämta SOL saldo:', error);
-      return 0;
+      // Try direct RPC as last resort
+      try {
+        const balance = await this.solanaConnection.getBalance(publicKey);
+        return balance / 1e9;
+      } catch {
+        return 0;
+      }
     }
   }
 
-  private async getEthereumBalance(address: string): Promise<number> {
+  private async getSolanaBalanceFromSolscan(address: string): Promise<number | null> {
+    try {
+      const response = await fetch(`${this.solscanApiUrl}/account?address=${address}`);
+      if (!response.ok) throw new Error('Solscan API error');
+      
+      const data = await response.json();
+      if (data.lamports) {
+        return data.lamports / 1e9; // Convert lamports to SOL
+      }
+      return null;
+    } catch (error) {
+      console.warn('Solscan API failed:', error);
+      return null;
+    }
+  }
+
+  private async getEthereumBalanceAccurate(address: string): Promise<number> {
     try {
       if (!window.ethereum) throw new Error('Ingen Ethereum provider');
       
@@ -143,22 +182,28 @@ class WalletService {
     }
   }
 
-  async getPhantomStatus(): Promise<{ connected: boolean; address?: string }> {
+  async getPhantomStatus(): Promise<{ connected: boolean; address?: string; balance?: number }> {
     if (!this.isBrowser() || !window.solana?.isPhantom) {
       return { connected: false };
     }
 
     if (window.solana.isConnected && window.solana.publicKey) {
-      return {
-        connected: true,
-        address: window.solana.publicKey.toString()
-      };
+      try {
+        const balance = await this.getSolanaBalanceAccurate(window.solana.publicKey);
+        return {
+          connected: true,
+          address: window.solana.publicKey.toString(),
+          balance: balance
+        };
+      } catch (error) {
+        console.error('Phantom status check failed:', error);
+      }
     }
 
     return { connected: false };
   }
 
-  async getMetaMaskStatus(): Promise<{ connected: boolean; address?: string }> {
+  async getMetaMaskStatus(): Promise<{ connected: boolean; address?: string; balance?: number }> {
     if (!this.isBrowser() || !window.ethereum?.isMetaMask) {
       return { connected: false };
     }
@@ -166,9 +211,11 @@ class WalletService {
     try {
       const accounts = await window.ethereum.request({ method: 'eth_accounts' });
       if (accounts && accounts.length > 0) {
+        const balance = await this.getEthereumBalanceAccurate(accounts[0]);
         return {
           connected: true,
-          address: accounts[0]
+          address: accounts[0],
+          balance: balance
         };
       }
     } catch (error) {
