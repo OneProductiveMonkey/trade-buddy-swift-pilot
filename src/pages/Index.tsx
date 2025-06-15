@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { TradingDashboard } from '@/components/TradingDashboard';
 import { Portfolio } from '@/components/Portfolio';
@@ -10,13 +11,16 @@ import { WalletConnection } from '@/components/WalletConnection';
 import { TrendingCoins } from '@/components/TrendingCoins';
 import { TradeReplay } from '@/components/TradeReplay';
 import { AutoModeStatus } from '@/components/AutoModeStatus';
+import { MemeRadarPanel } from '@/components/MemeRadarPanel';
 import { notificationService } from '@/services/notificationService';
+import { Badge } from '@/components/ui/badge';
 
 const Index = () => {
   const [balance, setBalance] = useState(10000);
   const [positions, setPositions] = useState([]);
   const [botActive, setBotActive] = useState(false);
   const [botProfit, setBotProfit] = useState(0);
+  const [sandboxMode, setSandboxMode] = useState(true);
   const { toast } = useToast();
 
   const handleTrade = (order) => {
@@ -72,10 +76,17 @@ const Index = () => {
 
     const strategyText = order.strategy ? ` (${order.strategy.toUpperCase()})` : '';
     const exchangeText = order.exchange ? ` via ${order.exchange}` : '';
+    const sandboxText = sandboxMode ? ' [SANDBOX]' : '';
     
     toast({
-      title: `Handel genomförd${strategyText}`,
+      title: `Handel genomförd${strategyText}${sandboxText}`,
       description: `${order.type.toUpperCase()} ${order.amount.toFixed(6)} ${order.symbol} för $${order.price}${exchangeText}`,
+    });
+
+    // Send notification
+    notificationService.notifyTradeExecuted({
+      ...order,
+      sandbox: sandboxMode
     });
   };
 
@@ -101,14 +112,26 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
       <div className="container mx-auto px-4 py-6">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent mb-2">
-            Advanced AI Trading Bot Pro
-          </h1>
-          <p className="text-gray-400">Multi-Exchange Arbitrage & AI Signal Trading Platform</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent mb-2">
+                Advanced AI Trading Bot Pro
+              </h1>
+              <p className="text-gray-400">Multi-Exchange Arbitrage & AI Signal Trading Platform</p>
+            </div>
+            
+            {/* Sandbox Mode Indicator */}
+            {sandboxMode && (
+              <Badge variant="outline" className="text-orange-400 border-orange-400 text-lg px-4 py-2">
+                🧪 SANDBOX MODE
+              </Badge>
+            )}
+          </div>
+          
           {botActive && (
             <div className="mt-2 flex items-center text-green-400">
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse mr-2"></div>
-              Bot profit: +${botProfit.toFixed(2)}
+              Bot profit: +${botProfit.toFixed(2)} {sandboxMode && '(Simulerat)'}
             </div>
           )}
         </div>
@@ -123,30 +146,33 @@ const Index = () => {
           />
         </div>
 
-        {/* New Features Grid */}
+        {/* New Enhanced Features Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <AutoModeStatus />
+          <MemeRadarPanel />
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <WalletConnection />
-          <AutoModeStatus />
+          <TradeReplay />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <TrendingCoins />
-          <TradeReplay />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          <div className="lg:col-span-2">
-            <TradingDashboard />
-          </div>
           <div className="space-y-6">
             <Portfolio balance={balance} positions={positions} />
             <OrderForm onTrade={handleTrade} />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <MarketData />
-          <TradingHistory positions={positions} />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <TradingDashboard />
+          </div>
+          <div className="space-y-6">
+            <MarketData />
+            <TradingHistory positions={positions} />
+          </div>
         </div>
       </div>
     </div>

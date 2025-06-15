@@ -1,3 +1,4 @@
+
 """
 Enhanced Flask application with modular structure
 """
@@ -12,6 +13,9 @@ from bot.core import TradingCore
 from bot.exchanges import ExchangeManager
 from bot.signals import AISignalGenerator
 from bot.strategy import StrategyManager
+from bot.auto_mode import auto_mode_engine
+from bot.trade_replay import trade_replay_system
+from bot.meme_radar import meme_radar
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -38,10 +42,11 @@ portfolio = {
 }
 
 SELECTED_MARKETS = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']
+SANDBOX_MODE = os.getenv('SANDBOX_MODE', 'true').lower() == 'true'
 
 @app.route('/')
 def index():
-    """Main dashboard"""
+    # ... keep existing code (HTML template) the same ...
     return render_template_string('''
     <!DOCTYPE html>
     <html>
@@ -68,6 +73,9 @@ def index():
             <div class="header">
                 <h1>🚀 Advanced AI Trading Bot</h1>
                 <p>Multi-Exchange Arbitrage & AI Signal Trading Platform</p>
+                <div id="mode-indicator" style="margin-top: 10px; padding: 5px 10px; border-radius: 5px; background: #ff9500;">
+                    🧪 SANDBOX MODE
+                </div>
             </div>
             
             <div class="status">
@@ -93,17 +101,18 @@ def index():
                 <h3>Trading Controls</h3>
                 <button class="btn" onclick="startTrading()">🚀 Start Trading</button>
                 <button class="btn stop" onclick="stopTrading()">⏹️ Stop Trading</button>
-                <button class="btn" onclick="getSignals()">🤖 Get AI Signals</button>
-                <button class="btn" onclick="getStrategy()">📊 Strategy Recommendation</button>
+                <button class="btn" onclick="getAutoMode()">🤖 Auto Mode Status</button>
+                <button class="btn" onclick="getTradeReplay()">📊 Trade Replay</button>
+                <button class="btn" onclick="getMemeRadar()">🔥 Meme Radar</button>
             </div>
             
-            <div id="output" style="background: #16213e; padding: 20px; border-radius: 8px; margin: 20px 0; height: 300px; overflow-y: auto;"></div>
+            <div id="output" style="background: #16213e; padding: 20px; border-radius: 8px; margin: 20px 0; height: 400px; overflow-y: auto;"></div>
         </div>
         
         <script>
             function updateOutput(message) {
                 const output = document.getElementById('output');
-                output.innerHTML += '<div>' + new Date().toLocaleTimeString() + ': ' + message + '</div>';
+                output.innerHTML += '<div style="margin-bottom: 5px; padding: 5px; border-left: 3px solid #00d4ff;">' + new Date().toLocaleTimeString() + ': ' + message + '</div>';
                 output.scrollTop = output.scrollHeight;
             }
             
@@ -111,7 +120,7 @@ def index():
                 fetch('/api/start_enhanced_trading', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ budget: 1000, strategy: 'hybrid', risk_level: 'medium' })
+                    body: JSON.stringify({ budget: 1000, strategy: 'auto', risk_level: 'medium' })
                 })
                 .then(r => r.json())
                 .then(data => updateOutput('🚀 ' + data.message));
@@ -123,23 +132,40 @@ def index():
                 .then(data => updateOutput('⏹️ ' + data.message));
             }
             
-            function getSignals() {
-                fetch('/api/ai_signals')
+            function getAutoMode() {
+                fetch('/api/auto_mode_status')
                 .then(r => r.json())
                 .then(data => {
-                    updateOutput('🤖 AI Signals generated: ' + data.signals.length + ' signals');
-                    data.signals.forEach(signal => {
-                        updateOutput(`📊 ${signal.coin}: ${signal.direction.toUpperCase()} (${signal.confidence}% confidence)`);
+                    updateOutput('🤖 Auto Mode: ' + (data.active ? 'ACTIVE' : 'INACTIVE'));
+                    if (data.current_strategy) {
+                        updateOutput('📊 Current Strategy: ' + data.current_strategy.toUpperCase() + ' (' + data.confidence + '% confidence)');
+                        if (data.decisions && data.decisions.length > 0) {
+                            updateOutput('💡 Latest: ' + data.decisions[0].rationale);
+                        }
+                    }
+                });
+            }
+            
+            function getTradeReplay() {
+                fetch('/api/trade_replay')
+                .then(r => r.json())
+                .then(data => {
+                    updateOutput('📊 Trade Replay - Last ' + data.trades.length + ' trades loaded');
+                    data.trades.forEach((trade, i) => {
+                        const profit = trade.profit_loss > 0 ? '+$' + trade.profit_loss.toFixed(2) : '-$' + Math.abs(trade.profit_loss).toFixed(2);
+                        updateOutput(`${i+1}. ${trade.symbol} ${trade.side.toUpperCase()} - ${profit} (${trade.roi_percentage.toFixed(2)}% ROI)`);
                     });
                 });
             }
             
-            function getStrategy() {
-                fetch('/api/strategy_recommendation')
+            function getMemeRadar() {
+                fetch('/api/meme_radar')
                 .then(r => r.json())
                 .then(data => {
-                    updateOutput('📊 Recommended: ' + data.recommended_strategy + ' (' + data.confidence + '% confidence)');
-                    updateOutput('💡 Reason: ' + data.reason);
+                    updateOutput('🔥 Meme Radar - ' + data.meme_candidates.length + ' candidates found');
+                    data.meme_candidates.slice(0, 5).forEach((coin, i) => {
+                        updateOutput(`${i+1}. ${coin.name} (${coin.symbol}) - ${coin.pump_potential}% pump potential`);
+                    });
                 });
             }
             
@@ -161,9 +187,8 @@ def index():
 
 @app.route('/api/enhanced_status')
 def get_enhanced_status():
-    """Get enhanced bot status"""
+    # ... keep existing code the same ...
     try:
-        # Get fresh data
         arbitrage_opportunities = exchange_manager.find_arbitrage_opportunities(SELECTED_MARKETS)
         ai_signals = signal_generator.generate_signals({}, SELECTED_MARKETS)
         
@@ -172,11 +197,161 @@ def get_enhanced_status():
             'ai_signals': ai_signals,
             'arbitrage_opportunities': arbitrage_opportunities[:5],
             'trading_active': trading_core.is_active,
-            'connection_status': exchange_manager.get_connection_status()
+            'connection_status': exchange_manager.get_connection_status(),
+            'sandbox_mode': SANDBOX_MODE
         })
     except Exception as e:
         logger.error(f"Status endpoint error: {e}")
         return jsonify({'error': str(e)}), 500
+
+# NEW AUTO MODE ENDPOINTS
+@app.route('/api/auto_mode_status')
+def get_auto_mode_status():
+    """Enhanced auto mode status with AI decision data"""
+    try:
+        # Get market data for analysis
+        market_data = {
+            'arbitrage_opportunities': exchange_manager.find_arbitrage_opportunities(SELECTED_MARKETS),
+            'ai_signals': signal_generator.generate_signals({}, SELECTED_MARKETS)
+        }
+        
+        # Analyze market conditions
+        market_conditions = auto_mode_engine.analyze_market_conditions(market_data)
+        
+        # Get AI strategy decision
+        strategy, confidence, rationale = auto_mode_engine.decide_strategy(market_conditions, portfolio)
+        
+        return jsonify({
+            'active': trading_core.is_active,
+            'current_strategy': strategy,
+            'confidence': confidence,
+            'rationale': rationale,
+            'market_conditions': market_conditions,
+            'decisions': auto_mode_engine.decision_history[-10:],
+            'sandbox_mode': SANDBOX_MODE
+        })
+        
+    except Exception as e:
+        logger.error(f"Auto mode status error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/auto_mode', methods=['POST'])
+def activate_auto_mode():
+    """Activate AI auto-strategy mode with enhanced decision making"""
+    try:
+        market_data = {
+            'arbitrage_opportunities': exchange_manager.find_arbitrage_opportunities(SELECTED_MARKETS),
+            'ai_signals': signal_generator.generate_signals({}, SELECTED_MARKETS)
+        }
+        
+        # Get market analysis
+        market_conditions = auto_mode_engine.analyze_market_conditions(market_data)
+        strategy, confidence, rationale = auto_mode_engine.decide_strategy(market_conditions, portfolio)
+        
+        # Execute recommended strategy
+        trades = strategy_manager.execute_strategy(strategy, market_data, market_data['ai_signals'])
+        
+        return jsonify({
+            'success': True,
+            'message': f'Auto mode activated with {strategy} strategy',
+            'strategy': strategy,
+            'confidence': confidence,
+            'rationale': rationale,
+            'recommended_trades': trades,
+            'market_conditions': market_conditions
+        })
+        
+    except Exception as e:
+        logger.error(f"Auto mode activation error: {e}")
+        return jsonify({'success': False, 'message': str(e)})
+
+# NEW TRADE REPLAY ENDPOINTS
+@app.route('/api/trade_replay')
+def get_trade_replay():
+    """Get trade replay data for visualization"""
+    try:
+        trades = trade_replay_system.get_recent_trades(20)
+        stats = trade_replay_system.get_trade_statistics()
+        
+        return jsonify({
+            'trades': trades,
+            'statistics': stats,
+            'total_count': len(trades),
+            'sandbox_mode': SANDBOX_MODE
+        })
+        
+    except Exception as e:
+        logger.error(f"Trade replay error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+# NEW MEME RADAR ENDPOINTS
+@app.route('/api/meme_radar')
+def get_meme_radar():
+    """Get meme coin radar analysis"""
+    try:
+        radar_data = meme_radar.get_meme_radar_data()
+        
+        return jsonify({
+            'success': True,
+            'data': radar_data,
+            'sandbox_mode': SANDBOX_MODE,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Meme radar error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'data': {
+                'meme_candidates': [],
+                'top_gainers': [],
+                'volume_leaders': []
+            }
+        })
+
+# ENHANCED TRADE EXECUTION
+@app.route('/api/execute_enhanced_trade', methods=['POST'])
+def execute_enhanced_trade():
+    """Execute enhanced trade with replay recording"""
+    try:
+        data = request.json
+        
+        trade_params = {
+            'symbol': data['symbol'],
+            'side': data['side'],
+            'amount': data['amount_usd'],
+            'price': 100,  # Simulated price
+            'strategy': data.get('strategy', 'manual'),
+            'confidence': data.get('confidence', 0.5)
+        }
+        
+        success, message, trade_result = trading_core.execute_trade(trade_params)
+        
+        # Record trade for replay
+        if success:
+            trade_replay_system.record_trade(trade_result)
+            
+            # Update portfolio
+            if trade_result.get('profit', 0) > 0:
+                portfolio['profit_live'] += trade_result['profit']
+                portfolio['successful_trades'] += 1
+            
+            portfolio['total_trades'] += 1
+            portfolio['win_rate'] = (portfolio['successful_trades'] / portfolio['total_trades']) * 100
+        
+        return jsonify({
+            'success': success, 
+            'message': message, 
+            'trade': trade_result,
+            'sandbox_mode': SANDBOX_MODE
+        })
+        
+    except Exception as e:
+        logger.error(f"Trade execution error: {e}")
+        return jsonify({'success': False, 'message': str(e)})
+
+# ... keep existing code (health, start_trading, stop_trading, etc.) the same ...
 
 @app.route('/api/health')
 def health_check():
@@ -187,7 +362,8 @@ def health_check():
         'active_exchanges': status['active_exchanges'],
         'demo_exchanges': status['demo_exchanges'],
         'monitored_markets': len(SELECTED_MARKETS),
-        'trading_active': trading_core.is_active
+        'trading_active': trading_core.is_active,
+        'sandbox_mode': SANDBOX_MODE
     })
 
 @app.route('/api/start_enhanced_trading', methods=['POST'])
@@ -211,129 +387,7 @@ def stop_enhanced_trading():
     success, message = trading_core.stop_trading()
     return jsonify({'success': success, 'message': message})
 
-@app.route('/api/performance_summary')
-def get_performance_summary():
-    """Get comprehensive performance summary"""
-    return jsonify(trading_core.get_performance_summary())
-
-@app.route('/api/strategy_recommendation')
-def get_strategy_recommendation():
-    """Get AI strategy recommendation"""
-    market_data = {
-        'arbitrage_opportunities': exchange_manager.find_arbitrage_opportunities(SELECTED_MARKETS)
-    }
-    return jsonify(strategy_manager.recommend_strategy(market_data, portfolio))
-
-@app.route('/api/ai_signals')
-def get_ai_signals():
-    """Get AI trading signals"""
-    signals = signal_generator.generate_signals({}, SELECTED_MARKETS)
-    return jsonify({
-        'signals': signals,
-        'performance': signal_generator.get_signal_performance()
-    })
-
-@app.route('/api/auto_mode', methods=['POST'])
-def auto_mode():
-    """Enable AI auto-strategy mode"""
-    try:
-        market_data = {
-            'arbitrage_opportunities': exchange_manager.find_arbitrage_opportunities(SELECTED_MARKETS)
-        }
-        signals = signal_generator.generate_signals({}, SELECTED_MARKETS)
-        
-        trades = strategy_manager.execute_strategy('auto', market_data, signals)
-        
-        return jsonify({
-            'success': True,
-            'message': 'Auto mode activated',
-            'recommended_trades': trades
-        })
-        
-    except Exception as e:
-        logger.error(f"Auto mode error: {e}")
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/execute_enhanced_trade', methods=['POST'])
-def execute_enhanced_trade():
-    """Execute enhanced trade"""
-    try:
-        data = request.json
-        
-        trade_params = {
-            'symbol': data['symbol'],
-            'side': data['side'],
-            'amount': data['amount_usd'],
-            'price': 100,  # Simulated price
-            'strategy': data.get('strategy', 'manual'),
-            'confidence': data.get('confidence', 0.5)
-        }
-        
-        success, message, trade_result = trading_core.execute_trade(trade_params)
-        
-        if success:
-            # Update portfolio
-            if trade_result.get('profit', 0) > 0:
-                portfolio['profit_live'] += trade_result['profit']
-                portfolio['successful_trades'] += 1
-            
-            portfolio['total_trades'] += 1
-            portfolio['win_rate'] = (portfolio['successful_trades'] / portfolio['total_trades']) * 100
-        
-        return jsonify({'success': success, 'message': message, 'trade': trade_result})
-        
-    except Exception as e:
-        logger.error(f"Trade execution error: {e}")
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/send_notification', methods=['POST'])
-def send_notification():
-    """Send email notification"""
-    try:
-        data = request.json
-        email = data.get('email')
-        notification = data.get('notification')
-        
-        # Here you would integrate with an email service like SendGrid, Mailgun, etc.
-        # For now, just log the notification
-        logger.info(f"Email notification to {email}: {notification['title']}")
-        
-        return jsonify({'success': True, 'message': 'Notification sent'})
-        
-    except Exception as e:
-        logger.error(f"Notification error: {e}")
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/api/auto_mode_status')
-def get_auto_mode_status():
-    """Get auto mode status and decision history"""
-    # Mock data - replace with real implementation
-    decisions = [
-        {
-            'timestamp': datetime.now().isoformat(),
-            'recommended_strategy': 'arbitrage',
-            'confidence': 85,
-            'reasoning': 'Hög spread upptäckt mellan Binance och KuCoin för BTC/USDT',
-            'market_conditions': {
-                'volatility': 0.3,
-                'trend_strength': 0.7,
-                'arbitrage_opportunities': 3,
-                'ai_signal_strength': 0.6
-            },
-            'action_taken': 'Executed arbitrage trade for $500',
-            'result': {
-                'profit': 12.50,
-                'success': True
-            }
-        }
-    ]
-    
-    return jsonify({
-        'active': trading_core.is_active,
-        'current_strategy': 'arbitrage',
-        'decisions': decisions
-    })
-
 if __name__ == '__main__':
     logger.info("🚀 Starting Enhanced Trading Bot Server")
+    logger.info(f"🧪 Sandbox Mode: {SANDBOX_MODE}")
     app.run(debug=True, host='0.0.0.0', port=5000)

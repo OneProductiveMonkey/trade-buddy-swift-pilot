@@ -1,4 +1,3 @@
-
 // Backend API service for trading bot communication
 class TradingApiService {
   public baseUrl: string;
@@ -30,7 +29,89 @@ class TradingApiService {
         active_exchanges: 0,
         demo_exchanges: 5,
         monitored_markets: 3,
-        trading_active: false
+        trading_active: false,
+        sandbox_mode: true
+      };
+    }
+  }
+
+  async getAutoModeStatus() {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/auto_mode_status`);
+      if (!response.ok) throw new Error('Auto mode status failed');
+      return await response.json();
+    } catch (error) {
+      console.error('API Error - Auto Mode Status:', error);
+      return {
+        active: false,
+        current_strategy: null,
+        confidence: 0,
+        rationale: 'Demo mode - inga AI beslut tillgängliga',
+        market_conditions: {},
+        decisions: [],
+        sandbox_mode: true
+      };
+    }
+  }
+
+  async activateAutoMode() {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/auto_mode`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) throw new Error('Auto mode activation failed');
+      return await response.json();
+    } catch (error) {
+      console.error('API Error - Auto Mode:', error);
+      return { 
+        success: false, 
+        message: 'Auto mode activation failed',
+        strategy: 'hybrid',
+        confidence: 75,
+        rationale: 'Demo mode - simulerad AI strategi'
+      };
+    }
+  }
+
+  async getTradeReplay() {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/trade_replay`);
+      if (!response.ok) throw new Error('Trade replay failed');
+      return await response.json();
+    } catch (error) {
+      console.error('API Error - Trade Replay:', error);
+      return {
+        trades: [],
+        statistics: {
+          total_trades: 0,
+          winning_trades: 0,
+          win_rate: 0,
+          avg_roi: 0,
+          total_profit: 0
+        },
+        total_count: 0,
+        sandbox_mode: true
+      };
+    }
+  }
+
+  async getMemeRadarData() {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/meme_radar`);
+      if (!response.ok) throw new Error('Meme radar failed');
+      return await response.json();
+    } catch (error) {
+      console.error('API Error - Meme Radar:', error);
+      return {
+        success: false,
+        data: {
+          meme_candidates: [],
+          top_gainers: [],
+          volume_leaders: [],
+          total_analyzed: 0
+        },
+        sandbox_mode: true
       };
     }
   }
@@ -125,20 +206,6 @@ class TradingApiService {
     }
   }
 
-  async activateAutoMode() {
-    try {
-      const response = await fetch(`${this.baseUrl}/api/auto_mode`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      if (!response.ok) throw new Error('Auto mode activation failed');
-      return await response.json();
-    } catch (error) {
-      console.error('API Error - Auto Mode:', error);
-      return { success: false, message: 'Auto mode activation failed' };
-    }
-  }
-
   async getPerformanceSummary() {
     try {
       const response = await fetch(`${this.baseUrl}/api/performance_summary`);
@@ -176,7 +243,8 @@ class TradingApiService {
       arbitrage_opportunities: [],
       trading_active: false,
       prices: {},
-      market_data: {}
+      market_data: {},
+      sandbox_mode: true
     };
   }
 }
