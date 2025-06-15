@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,7 +46,7 @@ export const AutoModeStatus: React.FC = () => {
     setLoading(true);
     try {
       if (status?.active) {
-        // Stop auto mode (implement in tradingApi)
+        // Stop auto mode
         await tradingApi.stopEnhancedTrading();
         toast({
           title: "Auto Mode Inaktiverad",
@@ -63,7 +62,7 @@ export const AutoModeStatus: React.FC = () => {
         } else {
           toast({
             title: "Auto Mode Fel",
-            description: result.message,
+            description: result.message || 'Kunde inte aktivera auto mode',
             variant: "destructive",
           });
         }

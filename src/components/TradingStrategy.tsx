@@ -53,7 +53,7 @@ export const TradingStrategy: React.FC = () => {
       } else {
         toast({
           title: "Fel vid aktivering av auto-läge",
-          description: result.message,
+          description: result.message || 'Kunde inte aktivera auto-läge',
           variant: "destructive",
         });
       }
